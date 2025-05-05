@@ -1,0 +1,26 @@
+{
+  "sortedMiddleware": [],
+  "middleware": {},
+  "functions": {
+    "/api/speech/route": {
+      "files": [
+        "server/middleware-build-manifest.js",
+        "server/middleware-react-loadable-manifest.js",
+        "server/next-font-manifest.js",
+        "server/edge-runtime-webpack.js",
+        "server/app/api/speech/route.js"
+      ],
+      "name": "app/api/speech/route",
+      "page": "/api/speech/route",
+      "matchers": [
+        {
+          "regexp": "^/api/speech$",
+          "originalSource": "/api/speech"
+        }
+      ],
+      "wasm": [],
+      "assets": []
+    }
+  },
+  "version": 2
+}
