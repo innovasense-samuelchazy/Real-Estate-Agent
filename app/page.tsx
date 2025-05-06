@@ -83,12 +83,50 @@ export default function Home() {
     }
   }, []);
   
+  // Add this useEffect to detect production environment and set appropriate fallback settings
+  useEffect(() => {
+    // Check if we're in production (Vercel deployment)
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      console.log('Running in production environment - checking microphone compatibility');
+      // Pre-check microphone compatibility in production
+      checkMicrophoneCompatibility();
+    }
+  }, []);
+  
   // Add this helper function to generate a random session ID
   const generateSessionId = (): string => {
     return 'session_' + Math.random().toString(36).substring(2, 15) + 
            Math.random().toString(36).substring(2, 15);
   };
   
+  // New function to check microphone compatibility
+  const checkMicrophoneCompatibility = async () => {
+    // Check if the browser supports getUserMedia
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.error('Browser does not support getUserMedia');
+      setHasFallbackEnabled(true);
+      window.sessionStorage.setItem('enableFallback', 'true');
+      setMessage("Your browser doesn't support microphone access. Using text-only mode.");
+      return false;
+    }
+
+    // Check if we can get permission for the microphone
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Stop all tracks immediately, we just needed to check permission
+      stream.getTracks().forEach(track => track.stop());
+      console.log('Microphone permission granted');
+      return true;
+    } catch (error) {
+      console.error('Error accessing microphone during compatibility check:', error);
+      setHasFallbackEnabled(true);
+      window.sessionStorage.setItem('enableFallback', 'true');
+      setMessage("Microphone access not available. Using text-only mode.");
+      return false;
+    }
+  };
+  
+  // Modify startListening to handle production-specific issues
   const startListening = async () => {
     setIsListening(true);
     setMessage("I'm listening...");
@@ -97,41 +135,78 @@ export default function Home() {
     lastAudioTimestampRef.current = Date.now(); // Initialize last audio timestamp
     
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Add a timeout for getUserMedia to prevent hanging
+      const microphonePromise = navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Microphone access timed out')), 5000);
+      });
+      
+      // Race the promises
+      const stream = await Promise.race([microphonePromise, timeoutPromise]) as MediaStream;
       console.log('Microphone access granted');
       
-      // Set up audio analysis for silence detection
+      // Store the stream for cleanup
+      streamRef.current = stream;
+      
+      // Rest of the existing code for audio context setup
       if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        try {
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        } catch (audioContextError) {
+          console.error('Failed to create AudioContext:', audioContextError);
+          // Continue without audio analysis
+        }
       }
       
-      const audioContext = audioContextRef.current;
-      const analyser = audioContext.createAnalyser();
-      analyserRef.current = analyser;
-      
-      const microphone = audioContext.createMediaStreamSource(stream);
-      microphone.connect(analyser);
-      
-      analyser.fftSize = 256;
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
+      if (audioContextRef.current) {
+        const audioContext = audioContextRef.current;
+        try {
+          const analyser = audioContext.createAnalyser();
+          analyserRef.current = analyser;
+          
+          const microphone = audioContext.createMediaStreamSource(stream);
+          microphone.connect(analyser);
+          
+          analyser.fftSize = 256;
+        } catch (analyserError) {
+          console.error('Failed to set up audio analysis:', analyserError);
+          // Continue without audio analysis
+        }
+      }
       
       // Start silence detection
       startSilenceDetection();
       
-      // Set up media recorder
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-        ? 'audio/webm;codecs=opus' 
-        : 'audio/webm';
+      // Set up media recorder with error handling
+      let mimeType = 'audio/webm';
+      
+      // Check if opus codec is supported
+      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        mimeType = 'audio/webm;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+        mimeType = 'audio/webm';
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        mimeType = 'audio/mp4';
+      } else {
+        console.warn('Using default MIME type, preferred types not supported');
+      }
       
       console.log('Using MIME type:', mimeType);
       
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: mimeType,
-      });
+      // Create MediaRecorder with error handling
+      let mediaRecorder;
+      try {
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
+      } catch (mrError) {
+        console.error('Failed to create MediaRecorder with specified MIME type, trying default:', mrError);
+        mediaRecorder = new MediaRecorder(stream);
+      }
       
       mediaRecorderRef.current = mediaRecorder;
       
+      // Keep the rest of the existing code for mediaRecorder events
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
@@ -164,11 +239,12 @@ export default function Home() {
           clearInterval(silenceTimeoutRef.current);
           silenceTimeoutRef.current = null;
         }
-        
-        // Clean up audio context resources
-        if (analyserRef.current) {
-          // Disconnect not needed as the mediaRecorder.stop() already stops the stream
-        }
+      };
+      
+      mediaRecorder.onerror = (event) => {
+        console.error('MediaRecorder error:', event);
+        setIsListening(false);
+        setMessage("There was an error with the audio recording. Please try again.");
       };
       
       mediaRecorder.start(100); // Collect data every 100ms
@@ -177,7 +253,15 @@ export default function Home() {
     } catch (error) {
       console.error('Error accessing microphone:', error);
       setIsListening(false);
-      setMessage(`Error accessing microphone: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // In production, automatically enable fallback on microphone errors
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        setHasFallbackEnabled(true);
+        window.sessionStorage.setItem('enableFallback', 'true');
+        setMessage("Microphone access issue. I'll still try to help with your Dubai property search.");
+      } else {
+        setMessage(`Error accessing microphone: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
   };
   
@@ -307,11 +391,16 @@ export default function Home() {
         console.log('Fallback mode is enabled for this request');
       }
       
+      // Detect if we're in production (Vercel)
+      const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+      if (isProduction) {
+        console.log('Running in production environment');
+        formData.append('environment', 'production');
+      }
+      
       // Use our API endpoint
       const apiUrl = '/api/speech';
       console.log('Sending to API endpoint:', apiUrl);
-      
-      console.log('Sending request...');
       
       // Add a longer timeout for the fetch request
       const controller = new AbortController();
@@ -367,27 +456,77 @@ export default function Home() {
         } 
         else if (contentType.includes('application/json')) {
           // JSON response
-          const jsonData = await response.json();
-          console.log('API JSON response:', jsonData);
-          
-          if (jsonData.success) {
-            setMessage(jsonData.message || "Your message has been processed successfully!");
-          } else {
-            setMessage(jsonData.message || jsonData.error || "There was an error processing your message.");
+          console.log('Processing JSON response');
+          try {
+            const jsonData = await response.json();
+            console.log('API JSON response:', jsonData);
+            
+            // If this is a fallback response and we're not in fallback mode,
+            // enable fallback mode for future requests
+            if (jsonData.isFallback && !hasFallbackEnabled) {
+              console.log('Received fallback response - enabling fallback mode for future requests');
+              setHasFallbackEnabled(true);
+              window.sessionStorage.setItem('enableFallback', 'true');
+            }
+            
+            if (jsonData.success) {
+              setMessage(jsonData.message || "Your message has been processed successfully!");
+            } else {
+              setMessage(jsonData.message || jsonData.error || "There was an error processing your message.");
+            }
+          } catch (jsonError) {
+            console.error('Error parsing JSON response:', jsonError);
+            
+            // If we're in production and encounter errors, enable fallback automatically
+            const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+            if (isProduction && !hasFallbackEnabled) {
+              setHasFallbackEnabled(true);
+              window.sessionStorage.setItem('enableFallback', 'true');
+              setMessage("I encountered an issue but I'll still try to help with your Dubai property search.");
+            } else {
+              setMessage("An unexpected response was received. Please try again.");
+            }
           }
         }
         else {
           // Text or other response
+          console.log('Processing text response');
           const textResponse = await response.text();
           console.log('API text response:', textResponse);
-          setMessage("Response received. Thank you for your message.");
+          try {
+            // Try to parse as JSON in case content type header is incorrect
+            const jsonData = JSON.parse(textResponse);
+            
+            // If this is a fallback response and we're not in fallback mode,
+            // enable fallback mode for future requests
+            if (jsonData.isFallback && !hasFallbackEnabled) {
+              console.log('Received fallback response - enabling fallback mode for future requests');
+              setHasFallbackEnabled(true);
+              window.sessionStorage.setItem('enableFallback', 'true');
+            }
+            
+            if (jsonData.success) {
+              setMessage(jsonData.message || "Your message has been processed successfully!");
+            } else {
+              setMessage(jsonData.message || jsonData.error || "There was an error processing your message.");
+            }
+          } catch (e) {
+            // If not valid JSON, return as text
+            setMessage("Response received. Thank you for your message.");
+          }
         }
       } catch (error) {
         clearTimeout(timeoutId);
         
         console.error('Error sending audio:', error);
         
-        if (error instanceof DOMException && error.name === 'AbortError') {
+        // For production, enable fallback automatically on error
+        const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+        if (isProduction && !hasFallbackEnabled) {
+          setHasFallbackEnabled(true);
+          window.sessionStorage.setItem('enableFallback', 'true');
+          setMessage("I'm having trouble connecting to our service, but I can still help with your Dubai property search.");
+        } else if (error instanceof DOMException && error.name === 'AbortError') {
           setMessage('Request took too long. The AI assistant service may be busy. Please try again shortly.');
         } else {
           setMessage('Connection error: ' + (error as Error).message + '. Please check your internet connection.');

@@ -5,7 +5,7 @@ export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Speech API route called');
+    console.log('Speech API route called', { isVercel: process.env.VERCEL === '1' });
     
     // Get the form data from the request
     const formData = await request.formData();
@@ -24,7 +24,8 @@ export async function POST(request: NextRequest) {
     console.log('Audio file received', {
       name: audioFile.name,
       type: audioFile.type,
-      size: audioFile.size
+      size: audioFile.size,
+      environment: process.env.NODE_ENV
     });
     
     // Create a new FormData to forward to the webhook
@@ -50,14 +51,17 @@ export async function POST(request: NextRequest) {
                        process.env.WEBHOOK_URL || 
                        'https://innovasense.app.n8n.cloud/webhook/lora/stt';
     
-    console.log('Forwarding request to webhook:', webhookUrl);
+    console.log('Environment info', {
+      webhookUrl,
+      isVercel: process.env.VERCEL === '1',
+      mockApi: process.env.NEXT_PUBLIC_MOCK_API,
+      enableFallback: process.env.NEXT_PUBLIC_ENABLE_FALLBACK,
+    });
     
     try {
       // Use a longer timeout since we're in Edge Runtime
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 50000); // 50 second timeout
-      
-      console.log('Attempting to fetch from webhook with URL:', webhookUrl);
       
       // Check if fallback mode is explicitly enabled in the request
       const enableFallback = formData.get('enableFallback') === 'true';
@@ -65,12 +69,16 @@ export async function POST(request: NextRequest) {
         console.log('Fallback mode enabled in request');
       }
       
-      // Return fallback response if MOCK_API is set or if we're in Vercel and having issues
-      // or if fallback is explicitly requested
-      if (process.env.NEXT_PUBLIC_MOCK_API === 'true' || 
-          (process.env.VERCEL === '1' && process.env.NEXT_PUBLIC_ENABLE_FALLBACK === 'true') ||
-          enableFallback) {
-        console.log('Using mock API response mode');
+      // Return fallback response if:
+      // 1. MOCK_API is set
+      // 2. We're in Vercel and either ENABLE_FALLBACK is true
+      // 3. Fallback is explicitly requested in the form data
+      const usesFallback = process.env.NEXT_PUBLIC_MOCK_API === 'true' || 
+                         (process.env.VERCEL === '1' && process.env.NEXT_PUBLIC_ENABLE_FALLBACK === 'true') ||
+                         enableFallback;
+      
+      if (usesFallback) {
+        console.log('Using mock API response mode (fallback)', { reason: enableFallback ? 'user_requested' : 'environment_config' });
         clearTimeout(timeoutId);
         
         // Create mock response with a 1-second delay to simulate API call
@@ -78,9 +86,12 @@ export async function POST(request: NextRequest) {
         
         return NextResponse.json({
           success: true,
-          message: "I'm your Real Estate AI assistant. I can help you find properties in Dubai based on your requirements. What are you looking for today?"
+          message: "I'm your Real Estate AI assistant. I can help you find properties in Dubai based on your requirements. What are you looking for today?",
+          isFallback: true
         });
       }
+      
+      console.log('Attempting to fetch from webhook with URL:', webhookUrl);
       
       const response = await fetch(webhookUrl, {
         method: 'POST',
@@ -101,11 +112,22 @@ export async function POST(request: NextRequest) {
           console.error('Could not read error response:', readError);
         }
         
+        // For Vercel deployment, automatically use fallback on webhook errors
+        if (process.env.VERCEL === '1') {
+          console.log('Webhook failed in Vercel - using fallback response');
+          return NextResponse.json({
+            success: true,
+            message: "I'm your Real Estate AI assistant. There seems to be an issue connecting to our service, but I can still help you find properties in Dubai. What are you looking for today?",
+            isFallback: true,
+            webhookError: response.status
+          });
+        }
+        
         // Return a more informative error
         return NextResponse.json(
           { 
             error: `Webhook returned status ${response.status}`,
-            message: "The AI service is currently unavailable. Please try again later.",
+            message: "The AI service is currently unavailable. Please try again later or enable fallback mode.",
             technical_detail: `Status: ${response.status}, StatusText: ${response.statusText}`
           },
           { status: 500 }
@@ -161,10 +183,21 @@ export async function POST(request: NextRequest) {
       // Check if this is an abort error (timeout)
       if (error instanceof DOMException && error.name === 'AbortError') {
         console.error('Request to webhook timed out');
+        
+        // In Vercel, use fallback on timeout
+        if (process.env.VERCEL === '1') {
+          return NextResponse.json({
+            success: true,
+            message: "I'm your Real Estate AI assistant. Our service is a bit slow right now, but I can still help you find properties in Dubai. What are you looking for today?",
+            isFallback: true,
+            reason: "timeout"
+          });
+        }
+        
         return NextResponse.json(
           { 
             success: false,
-            message: 'The AI service is taking too long to respond. Please try again later.',
+            message: 'The AI service is taking too long to respond. Please try again later or enable fallback mode.',
             timeout: true
           },
           { status: 202 } // 202 Accepted
@@ -172,20 +205,42 @@ export async function POST(request: NextRequest) {
       }
       
       console.error('Error forwarding to webhook:', error);
+      
+      // In Vercel, use fallback on connection errors
+      if (process.env.VERCEL === '1') {
+        return NextResponse.json({
+          success: true,
+          message: "I'm your Real Estate AI assistant. We're having connection issues, but I can still help you find properties in Dubai. What are you looking for today?",
+          isFallback: true,
+          reason: "connection_error"
+        });
+      }
+      
       return NextResponse.json(
         { 
           error: `Error connecting to AI service: ${(error as Error).message}`,
-          message: "Please check your internet connection and try again."
+          message: "Please check your internet connection and try again, or enable fallback mode."
         },
         { status: 500 }
       );
     }
   } catch (error) {
     console.error('API route error:', error);
+    
+    // In Vercel, use fallback on internal errors
+    if (process.env.VERCEL === '1') {
+      return NextResponse.json({
+        success: true,
+        message: "I'm your Real Estate AI assistant. We encountered an internal error, but I can still help you find properties in Dubai. What are you looking for today?",
+        isFallback: true,
+        reason: "internal_error"
+      });
+    }
+    
     return NextResponse.json(
       { 
         error: `Internal server error: ${(error as Error).message}`,
-        message: "An unexpected error occurred. Please try again later."
+        message: "An unexpected error occurred. Please try again later or enable fallback mode."
       },
       { status: 500 }
     );
