@@ -123,3 +123,41 @@ main {
     min-height: -webkit-fill-available;
   }
 }
+
+/* Desktop spacing - only applies to larger screens */
+@media screen and (min-width: 1024px) {
+  /* Add more breathing room between elements on desktop */
+  .desktop-py-16 {
+    padding-top: 4rem !important;
+    padding-bottom: 4rem !important;
+  }
+  
+  .desktop-mb-12 {
+    margin-bottom: 3rem !important;
+  }
+  
+  .desktop-mb-10 {
+    margin-bottom: 2.5rem !important;
+  }
+  
+  .desktop-mb-8 {
+    margin-bottom: 2rem !important;
+  }
+  
+  .desktop-mt-6 {
+    margin-top: 1.5rem !important;
+  }
+  
+  .desktop-p-6 {
+    padding: 1.5rem !important;
+  }
+  
+  .desktop-py-5 {
+    padding-top: 1.25rem !important;
+    padding-bottom: 1.25rem !important;
+  }
+  
+  .desktop-gap-4 {
+    gap: 1rem !important;
+  }
+}

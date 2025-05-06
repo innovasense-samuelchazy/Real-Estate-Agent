@@ -20,9 +20,9 @@ export const metadata: Metadata = {
     maximumScale: 1,
   },
   icons: {
-    icon: '/icons/icon-192x192.png',
-    shortcut: '/icons/icon-192x192.png',
-    apple: '/icons/apple-touch-icon.png',
+    icon: '/icons/InnovaSense_Logo_Icon_Final.png',
+    shortcut: '/icons/InnovaSense_Logo_Icon_Final.png',
+    apple: '/icons/InnovaSense_Logo_Icon_Final.png',
   },
 };
 
@@ -45,11 +45,11 @@ export default function RootLayout({
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="theme-color" content="#9966FF" />
 
-        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
-        <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#9966FF" />
-        <link rel="shortcut icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" href="/icons/InnovaSense_Logo_Icon_Final.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/InnovaSense_Logo_Icon_Final.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/icons/InnovaSense_Logo_Icon_Final.png" />
+        <link rel="mask-icon" href="/icons/InnovaSense_Logo_Icon_Final.png" color="#9966FF" />
+        <link rel="shortcut icon" href="/icons/InnovaSense_Logo_Icon_Final.png" />
       </head>
       <body className={inter.className}>
         {children}

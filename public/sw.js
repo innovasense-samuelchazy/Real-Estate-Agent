@@ -5,8 +5,8 @@ self.addEventListener('install', (event) => {
         '/',
         '/index.html',
         '/manifest.json',
-        '/icons/icon-192x192.png',
-        '/icons/icon-512x512.png',
+        '/icons/InnovaSense_Logo_Icon_Final.png',
+        '/offline.html',
         // Add other assets you want to cache for offline use
       ]);
     })
