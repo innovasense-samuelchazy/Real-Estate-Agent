@@ -6,6 +6,8 @@ export default function DynamicBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   useEffect(() => {
+    console.log('DynamicBackground component mounted');
+    
     const canvas = canvasRef.current;
     if (!canvas) return;
     
@@ -42,12 +44,12 @@ export default function DynamicBackground() {
         this.speedX = Math.random() * 1 - 0.5;
         this.speedY = Math.random() * 1 - 0.5;
         
-        // Lighter indigo colors palette
+        // Brighter indigo colors palette for better visibility
         const colors = [
-          'rgba(93, 63, 211, 0.8)',   // #5d3fd3 - Mid indigo
-          'rgba(126, 58, 242, 0.7)',   // #7e3af2 - Bright indigo
-          'rgba(131, 98, 217, 0.6)',   // #8362d9 - Light indigo
-          'rgba(196, 181, 253, 0.5)'   // #c4b5fd - Very light indigo
+          'rgba(93, 63, 211, 0.9)',   // #5d3fd3 - Mid indigo
+          'rgba(126, 58, 242, 0.8)',   // #7e3af2 - Bright indigo
+          'rgba(131, 98, 217, 0.7)',   // #8362d9 - Light indigo
+          'rgba(196, 181, 253, 0.6)'   // #c4b5fd - Very light indigo
         ];
         
         this.color = colors[Math.floor(Math.random() * colors.length)];
@@ -88,9 +90,9 @@ export default function DynamicBackground() {
     const animate = () => {
       if (!ctx) return;
       
-      // Create a gradient background
+      // Create a gradient background with more vibrant colors
       const gradient = ctx.createLinearGradient(0, 0, 0, safeCanvas.height);
-      // Lighter indigo gradient
+      // Brighter indigo gradient
       gradient.addColorStop(0, '#4c2889');  // Mid-dark indigo at the top
       gradient.addColorStop(1, '#7e3af2');  // Brighter indigo at the bottom
       
@@ -122,9 +124,9 @@ export default function DynamicBackground() {
           const distance = Math.sqrt(dx * dx + dy * dy);
           
           if (distance < maxDistance) {
-            // Set opacity based on distance
+            // Set opacity based on distance - increased opacity for better visibility
             const opacity = 1 - (distance / maxDistance);
-            ctx.strokeStyle = `rgba(214, 188, 250, ${opacity * 0.2})`;  // Lighter color with higher opacity
+            ctx.strokeStyle = `rgba(214, 188, 250, ${opacity * 0.3})`;  // Brighter color with higher opacity
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(particles[a].x, particles[a].y);
@@ -146,6 +148,7 @@ export default function DynamicBackground() {
     <canvas
       ref={canvasRef}
       className="fixed top-0 left-0 w-full h-full -z-10"
+      aria-hidden="true"
     />
   );
 } 

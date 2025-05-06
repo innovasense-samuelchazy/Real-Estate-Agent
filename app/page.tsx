@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import MicrophoneButton from './components/MicrophoneButton';
 import DynamicBackground from './components/DynamicBackground';
 import ClientOnly from './components/ClientOnly';
+import WaveAnimation from './components/WaveAnimation';
 
 interface ConversationItem {
   type: 'user' | 'assistant';
@@ -399,13 +401,16 @@ export default function Home() {
         <DynamicBackground />
       </ClientOnly>
       
-      <div className="w-full max-w-4xl mx-auto flex flex-col items-center justify-between h-full relative z-10 -mt-20">
+      <div className="w-full max-w-4xl mx-auto flex flex-col items-center justify-between h-full relative z-10">
         {/* Logo with enhanced size and subtle glow effect */}
         <div className="mb-8">
-          <img 
+          <Image 
             src="/images/innovasense-logo.png" 
             alt="InnovaSense" 
+            width={100}
+            height={40}
             className="h-40 w-auto filter drop-shadow-lg hover:drop-shadow-xl transition-all duration-300" 
+            priority
           />
         </div>
         
@@ -525,7 +530,10 @@ export default function Home() {
         </div>
       </div>
       
-      {/* Wave animation removed */}
+      {/* Wave animation restored */}
+      <ClientOnly>
+        <WaveAnimation isListening={isListening} />
+      </ClientOnly>
       
       {/* Hidden audio element for playback */}
       <audio 

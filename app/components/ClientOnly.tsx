@@ -4,17 +4,19 @@ import { useState, useEffect, ReactNode } from 'react';
 
 interface ClientOnlyProps {
   children: ReactNode;
+  fallback?: ReactNode;
 }
 
-export default function ClientOnly({ children }: ClientOnlyProps) {
+export default function ClientOnly({ children, fallback = null }: ClientOnlyProps) {
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
+    console.log('ClientOnly component mounted');
     setHasMounted(true);
   }, []);
 
   if (!hasMounted) {
-    return null;
+    return <>{fallback}</>;
   }
 
   return <>{children}</>;

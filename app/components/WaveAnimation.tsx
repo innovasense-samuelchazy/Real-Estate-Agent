@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 interface WaveAnimationProps {
@@ -7,6 +8,11 @@ interface WaveAnimationProps {
 }
 
 export default function WaveAnimation({ isListening }: WaveAnimationProps) {
+  // Add console log to confirm component renders
+  useEffect(() => {
+    console.log('WaveAnimation component mounted');
+  }, []);
+
   // Create fewer wave lines to be less distracting
   const waveCount = 6; // Reduced from 12
   const waves = Array.from({ length: waveCount }, (_, i) => i);
@@ -22,7 +28,7 @@ export default function WaveAnimation({ isListening }: WaveAnimationProps) {
   ];
   
   return (
-    <div className="absolute bottom-0 left-0 right-0 w-full overflow-hidden">
+    <div className="absolute bottom-0 left-0 right-0 w-full overflow-hidden z-0">
       <div className="relative h-[200px]"> {/* Reduced height */}
         {waves.map((i) => {
           const amplitude = 10 + i * 2; // Reduced amplitude
@@ -35,7 +41,7 @@ export default function WaveAnimation({ isListening }: WaveAnimationProps) {
           return (
             <motion.div
               key={i}
-              className={`absolute bottom-0 left-1/2 ${color} opacity-20 rounded-t-[100%]`} // Slightly increased opacity
+              className={`absolute bottom-0 left-1/2 ${color} opacity-30 rounded-t-[100%]`} // Increased opacity for better visibility
               style={{
                 height: `${height}px`,
                 width: `${width}px`,
@@ -44,7 +50,7 @@ export default function WaveAnimation({ isListening }: WaveAnimationProps) {
               animate={{
                 y: [0, -amplitude, 0], // Smaller movements
                 scaleX: [1, 1 + period * 0.008, 1], // Reduced scale changes
-                opacity: isListening ? [0.2, 0.3, 0.2] : [0.15, 0.2, 0.15] // Subtler opacity changes
+                opacity: isListening ? [0.3, 0.4, 0.3] : [0.2, 0.3, 0.2] // Increased opacity
               }}
               transition={{
                 repeat: Infinity,
