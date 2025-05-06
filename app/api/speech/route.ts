@@ -295,59 +295,6 @@ export async function POST(request: NextRequest) {
         totalSize: totalSize
       });
       
-      // In case the primary method fails, also create a fallback method
-      // using both approaches concurrently for reliability
-      let fallbackPromise = null;
-      
-      // Only in Vercel production, send a parallel request using the alternative method
-      if (process.env.VERCEL === '1' && process.env.NODE_ENV === 'production') {
-        console.log('Creating fallback request using base64 JSON method');
-        
-        // Full base64 representation for the fallback
-        // Convert to base64 in chunks to avoid call stack issues with large files
-        let fullBase64Audio = '';
-        const chunkSize = 1024; // Process 1KB at a time
-        
-        for (let i = 0; i < audioBytes.length; i += chunkSize) {
-          const chunk = audioBytes.slice(i, i + chunkSize);
-          const binaryString = Array.from(chunk)
-            .map(byte => String.fromCharCode(byte))
-            .join('');
-          fullBase64Audio += btoa(binaryString);
-        }
-        
-        // Create a JSON payload as fallback
-        const jsonData = {
-          sessionId,
-          email,
-          domain,
-          requestFrom: 'vercel-edge-fallback',
-          binaryAudio: true,
-          audioData: fullBase64Audio,
-          audioType: fileType,
-          audioName: fileName,
-          audioSize: audioBytes.length,
-          isBase64Fallback: true
-        };
-        
-        // Send fallback request
-        const fallbackUrl = webhookUrl + (webhookUrl.includes('?') ? '&' : '?') + 'mode=fallback';
-        
-        fallbackPromise = fetch(fallbackUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'User-Agent': 'Vercel Edge Function Fallback',
-            'X-Source': 'Vercel-Fallback-' + domain
-          },
-          body: JSON.stringify(jsonData)
-        }).catch(fallbackError => {
-          console.log('Fallback request error (this is fine if primary works):', fallbackError.message);
-          return null;
-        });
-      }
-      
       // Make the request with manually constructed multipart/form-data
       let response;
       try {
@@ -362,18 +309,70 @@ export async function POST(request: NextRequest) {
           body: requestBody,
           signal: controller.signal
         });
+        
+        // If response is not successful, throw an error to trigger the fallback
+        if (!response.ok) {
+          throw new Error(`Primary request failed with status ${response.status}`);
+        }
       } catch (primaryError) {
         console.error('Primary request failed:', primaryError);
         
-        // If fallback was sent, wait for its response
-        if (fallbackPromise) {
-          console.log('Attempting to use fallback response');
-          const fallbackResponse = await fallbackPromise;
-          if (fallbackResponse && fallbackResponse.ok) {
-            console.log('Fallback response received successfully');
-            response = fallbackResponse;
-          } else {
-            throw primaryError; // Re-throw the original error if fallback also failed
+        // Only create and use fallback if primary fails
+        if (process.env.VERCEL === '1' && process.env.NODE_ENV === 'production') {
+          console.log('Primary request failed, using base64 JSON fallback method');
+          
+          try {
+            // Convert to base64 in chunks to avoid call stack issues with large files
+            let fullBase64Audio = '';
+            const chunkSize = 1024; // Process 1KB at a time
+            
+            for (let i = 0; i < audioBytes.length; i += chunkSize) {
+              const chunk = audioBytes.slice(i, i + chunkSize);
+              const binaryString = Array.from(chunk)
+                .map(byte => String.fromCharCode(byte))
+                .join('');
+              fullBase64Audio += btoa(binaryString);
+            }
+            
+            // Create a JSON payload as fallback
+            const jsonData = {
+              sessionId,
+              email,
+              domain,
+              requestFrom: 'vercel-edge-fallback',
+              binaryAudio: true,
+              audioData: fullBase64Audio,
+              audioType: fileType,
+              audioName: fileName,
+              audioSize: audioBytes.length,
+              isBase64Fallback: true
+            };
+            
+            // Send fallback request
+            const fallbackUrl = webhookUrl + (webhookUrl.includes('?') ? '&' : '?') + 'mode=fallback';
+            
+            console.log('Sending fallback request to:', fallbackUrl);
+            const fallbackResponse = await fetch(fallbackUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'User-Agent': 'Vercel Edge Function Fallback',
+                'X-Source': 'Vercel-Fallback-' + domain
+              },
+              body: JSON.stringify(jsonData)
+            });
+            
+            if (fallbackResponse.ok) {
+              console.log('Fallback response received successfully');
+              response = fallbackResponse;
+            } else {
+              console.error('Fallback request also failed with status:', fallbackResponse.status);
+              throw primaryError; // Re-throw the original error if fallback also failed
+            }
+          } catch (fallbackError) {
+            console.error('Error in fallback method:', fallbackError);
+            throw primaryError; // Re-throw the original error
           }
         } else {
           throw primaryError;
