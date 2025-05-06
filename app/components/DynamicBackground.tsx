@@ -123,7 +123,13 @@ export default function DynamicBackground() {
           const dy = particles[a].y - particles[b].y;
           const distance = Math.sqrt(dx * dx + dy * dy);
           
-          if (distance < maxDistance) {
+          // Avoid drawing lines near the bottom of the screen
+          const bottomEdgeBuffer = 300; // Don't draw lines in the bottom 300px (increased from 100px)
+          const nearBottom = 
+            particles[a].y > safeCanvas.height - bottomEdgeBuffer || 
+            particles[b].y > safeCanvas.height - bottomEdgeBuffer;
+            
+          if (distance < maxDistance && !nearBottom) {
             // Set opacity based on distance - increased opacity for better visibility
             const opacity = 1 - (distance / maxDistance);
             ctx.strokeStyle = `rgba(214, 188, 250, ${opacity * 0.3})`;  // Brighter color with higher opacity
@@ -147,8 +153,10 @@ export default function DynamicBackground() {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed top-0 left-0 w-full h-full -z-10"
+      className="fixed top-0 left-0 w-full h-full -z-10 opacity-100"
       aria-hidden="true"
+      width={typeof window !== 'undefined' ? window.innerWidth : 1280}
+      height={typeof window !== 'undefined' ? window.innerHeight : 720}
     />
   );
 } 

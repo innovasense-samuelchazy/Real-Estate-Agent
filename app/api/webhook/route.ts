@@ -19,12 +19,24 @@ export async function POST(request: NextRequest) {
     
     console.log('Using webhook URL:', webhookUrl);
     
+    // Check if fallback mode is explicitly enabled in the request
+    const enableFallback = formData.get('enableFallback') === 'true';
+    if (enableFallback) {
+      console.log('Fallback mode enabled in request');
+    }
+    
     // Return mock response for development if configured
-    if (process.env.NEXT_PUBLIC_MOCK_API === 'true') {
-      console.log('Using mock API response for development');
+    if (process.env.NEXT_PUBLIC_MOCK_API === 'true' || 
+        (process.env.VERCEL === '1' && process.env.NEXT_PUBLIC_ENABLE_FALLBACK === 'true') ||
+        enableFallback) {
+      console.log('Using mock API response mode');
+      
+      // Create mock response with a 1-second delay to simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       return NextResponse.json({
         success: true,
-        message: "This is a mock response. In production, this would connect to the actual webhook service."
+        message: "I'm your Real Estate AI assistant. I can help you find properties in Dubai based on your requirements. What are you looking for today?"
       });
     }
     
@@ -83,13 +95,20 @@ export async function POST(request: NextRequest) {
     const data = await response.text();
     console.log('Processing text/JSON response');
     
-    // Return the response
-    return new NextResponse(data, {
-      status: response.status,
-      headers: {
-        'Content-Type': response.headers.get('Content-Type') || 'text/plain',
-      },
-    });
+    // Try to parse as JSON first
+    try {
+      const jsonData = JSON.parse(data);
+      return NextResponse.json(jsonData);
+    } catch (e) {
+      console.log('Response is not valid JSON, returning as text');
+      // Return the response as text if it's not valid JSON
+      return new NextResponse(data, {
+        status: response.status,
+        headers: {
+          'Content-Type': response.headers.get('Content-Type') || 'text/plain',
+        },
+      });
+    }
   } catch (error) {
     // Check if it's a timeout
     if (error instanceof DOMException && error.name === 'AbortError') {

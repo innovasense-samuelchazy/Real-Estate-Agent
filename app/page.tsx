@@ -21,6 +21,8 @@ export default function Home() {
   const [userEmail, setUserEmail] = useState<string>("");
   const [conversationHistory, setConversationHistory] = useState<ConversationItem[]>([]);
   const [sessionId, setSessionId] = useState<string>("");
+  const [hasFallbackEnabled, setHasFallbackEnabled] = useState(false);
+  const [hasApiError, setHasApiError] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -71,6 +73,15 @@ export default function Home() {
       console.log('Generated new session ID:', newSessionId);
     }
   }, [sessionId]);
+  
+  // Check for fallback mode in session storage
+  useEffect(() => {
+    const fallbackEnabled = window.sessionStorage.getItem('enableFallback') === 'true';
+    if (fallbackEnabled) {
+      setHasFallbackEnabled(true);
+      console.log('Fallback mode enabled from session storage');
+    }
+  }, []);
   
   // Add this helper function to generate a random session ID
   const generateSessionId = (): string => {
@@ -252,9 +263,20 @@ export default function Home() {
     }
   };
 
+  // Function to enable fallback mode
+  const enableFallbackMode = () => {
+    console.log('Enabling fallback mode');
+    // Create a session storage flag
+    window.sessionStorage.setItem('enableFallback', 'true');
+    setHasFallbackEnabled(true);
+    setHasApiError(false);
+    setMessage("Fallback mode enabled. You can now try again.");
+  };
+
   const sendAudioToWebhook = async (audioBlob: Blob) => {
     setIsLoading(true);
     setMessage("Hold on a second, while I retrieve the information...");
+    setHasApiError(false);
     
     try {
       console.log('Preparing to send audio blob:', {
@@ -276,6 +298,13 @@ export default function Home() {
       if (userEmail) {
         formData.append('email', userEmail);
         console.log('Adding email to request:', userEmail);
+      }
+      
+      // Check if fallback mode is enabled from session storage
+      const fallbackEnabled = window.sessionStorage.getItem('enableFallback') === 'true' || hasFallbackEnabled;
+      if (fallbackEnabled) {
+        formData.append('enableFallback', 'true');
+        console.log('Fallback mode is enabled for this request');
       }
       
       // Use our API endpoint
@@ -302,6 +331,7 @@ export default function Home() {
         // Check if the response is ok
         if (!response.ok) {
           console.error(`API error! status: ${response.status}`);
+          setHasApiError(true);
           
           // Try to get more detailed error information
           try {
@@ -413,9 +443,10 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center py-10 px-8 relative overflow-hidden">
+    <main className="flex min-h-screen flex-col items-center justify-center py-10 px-8 relative overflow-hidden bg-gradient-to-b from-[#1e1b4b] to-[#4c2889]">
       <ClientOnly>
         <DynamicBackground />
+        <WaveAnimation isListening={isListening} />
       </ClientOnly>
       
       <div className="w-full max-w-4xl mx-auto flex flex-col items-center justify-between h-full relative z-10">
@@ -494,6 +525,7 @@ export default function Home() {
           isListening ? 'border border-red-500/50 shadow-md shadow-red-500/20' : 
           isLoading ? 'border border-yellow-500/50 shadow-md shadow-yellow-500/20' : 
           isSpeaking ? 'border border-green-500/50 shadow-md shadow-green-500/20' : 
+          hasApiError ? 'border border-red-500/50' :
           'border border-[#8362d9]/50'
         }`}>
           <p className="text-white text-center font-medium">
@@ -509,13 +541,26 @@ export default function Home() {
               isListening ? 'bg-red-500 animate-pulse' : 
               isLoading ? 'bg-yellow-500 animate-pulse' : 
               isSpeaking ? 'bg-green-500 animate-pulse' : 
+              hasApiError ? 'bg-red-500' :
               'bg-[#c4b5fd]'
             }`}></div>
           </div>
+          
+          {/* Fallback mode button - only show when there's an API error */}
+          {hasApiError && !hasFallbackEnabled && (
+            <div className="mt-4 flex justify-center">
+              <button 
+                onClick={enableFallbackMode}
+                className="bg-[#7e3af2] hover:bg-[#6d28d9] text-white text-sm px-3 py-1 rounded-lg transition-colors duration-200"
+              >
+                Enable Fallback Mode
+              </button>
+            </div>
+          )}
         </div>
         
         {/* Email input */}
-        <div className="bg-[#6d28d9]/80 border border-[#8362d9] rounded-lg p-4 backdrop-blur-md w-full max-w-md mb-6">
+        <div className="bg-[#6d28d9]/80 border border-[#8362d9] rounded-lg p-4 backdrop-blur-md w-full max-w-md">
           <p className="text-white text-center mb-4">
             Ask the AI Assistant to email you the conversation.
           </p>
@@ -546,11 +591,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-      
-      {/* Wave animation restored */}
-      <ClientOnly>
-        <WaveAnimation isListening={isListening} />
-      </ClientOnly>
       
       {/* Hidden audio element for playback */}
       <audio 

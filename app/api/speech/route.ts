@@ -59,13 +59,26 @@ export async function POST(request: NextRequest) {
       
       console.log('Attempting to fetch from webhook with URL:', webhookUrl);
       
-      // Return fallback response if we're in development and MOCK_API is set
-      if (process.env.NEXT_PUBLIC_MOCK_API === 'true') {
-        console.log('Using mock API response for development');
+      // Check if fallback mode is explicitly enabled in the request
+      const enableFallback = formData.get('enableFallback') === 'true';
+      if (enableFallback) {
+        console.log('Fallback mode enabled in request');
+      }
+      
+      // Return fallback response if MOCK_API is set or if we're in Vercel and having issues
+      // or if fallback is explicitly requested
+      if (process.env.NEXT_PUBLIC_MOCK_API === 'true' || 
+          (process.env.VERCEL === '1' && process.env.NEXT_PUBLIC_ENABLE_FALLBACK === 'true') ||
+          enableFallback) {
+        console.log('Using mock API response mode');
         clearTimeout(timeoutId);
+        
+        // Create mock response with a 1-second delay to simulate API call
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         return NextResponse.json({
           success: true,
-          message: "This is a mock response for development. In production, this would connect to the actual AI service."
+          message: "I'm your Real Estate AI assistant. I can help you find properties in Dubai based on your requirements. What are you looking for today?"
         });
       }
       
@@ -119,14 +132,30 @@ export async function POST(request: NextRequest) {
       // For JSON responses
       else if (contentType.includes('application/json')) {
         console.log('Processing JSON response');
-        const jsonData = await response.json();
-        return NextResponse.json(jsonData);
+        try {
+          const jsonData = await response.json();
+          return NextResponse.json(jsonData);
+        } catch (jsonError) {
+          console.error('Error parsing JSON response:', jsonError);
+          // If JSON parsing fails, return a fallback response
+          return NextResponse.json({ 
+            success: true, 
+            message: "I received your request, but had trouble processing the response. How can I help you with Dubai real estate today?"
+          });
+        }
       } 
       // For text or other responses
       else {
         console.log('Processing text response');
         const textData = await response.text();
-        return NextResponse.json({ text: textData });
+        try {
+          // Try to parse as JSON in case content type header is incorrect
+          const jsonData = JSON.parse(textData);
+          return NextResponse.json(jsonData);
+        } catch (e) {
+          // If not valid JSON, return as text
+          return NextResponse.json({ text: textData });
+        }
       }
     } catch (error) {
       // Check if this is an abort error (timeout)
