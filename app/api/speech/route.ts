@@ -5,7 +5,10 @@ export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Speech API route called', { isVercel: process.env.VERCEL === '1' });
+    console.log('Speech API route called', { 
+      isVercel: process.env.VERCEL === '1',
+      headers: Object.fromEntries(request.headers.entries())
+    });
     
     // Get the form data from the request
     const formData = await request.formData();
@@ -25,26 +28,9 @@ export async function POST(request: NextRequest) {
       name: audioFile.name,
       type: audioFile.type,
       size: audioFile.size,
-      environment: process.env.NODE_ENV
+      environment: process.env.NODE_ENV,
+      formDataKeys: Array.from(formData.keys())
     });
-    
-    // Create a new FormData to forward to the webhook
-    const forwardFormData = new FormData();
-    forwardFormData.append('audio', audioFile, 'audio.webm');
-    
-    // Forward session ID if provided
-    const sessionId = formData.get('sessionId');
-    if (sessionId) {
-      forwardFormData.append('sessionId', sessionId as string);
-      console.log('Forwarding session ID:', sessionId);
-    }
-    
-    // Forward email if provided
-    const email = formData.get('email');
-    if (email) {
-      forwardFormData.append('email', email as string);
-      console.log('Forwarding email:', email);
-    }
     
     // Get webhook URL with fallback
     const webhookUrl = process.env.NEXT_PUBLIC_WEBHOOK_URL || 
@@ -59,9 +45,20 @@ export async function POST(request: NextRequest) {
     });
     
     try {
-      // Use a longer timeout since we're in Edge Runtime
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 50000); // 50 second timeout
+      // Check if this is a test call to verify the environment
+      if (formData.get('test') === 'true') {
+        console.log('Test request detected, returning debug info');
+        return NextResponse.json({
+          success: true,
+          message: "This is a test response to check webhook connectivity",
+          environment: {
+            isVercel: process.env.VERCEL === '1',
+            webhookUrl: webhookUrl,
+            audioSize: audioFile?.size || 0,
+            formData: Array.from(formData.keys())
+          }
+        });
+      }
       
       // Check if fallback mode is explicitly enabled in the request
       const enableFallback = formData.get('enableFallback') === 'true';
@@ -79,7 +76,6 @@ export async function POST(request: NextRequest) {
       
       if (usesFallback) {
         console.log('Using mock API response mode (fallback)', { reason: enableFallback ? 'user_requested' : 'environment_config' });
-        clearTimeout(timeoutId);
         
         // Create mock response with a 1-second delay to simulate API call
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -91,23 +87,89 @@ export async function POST(request: NextRequest) {
         });
       }
       
-      console.log('Attempting to fetch from webhook with URL:', webhookUrl);
+      // ------ DIFFERENT APPROACH FOR AUDIO FILE TRANSFER TO N8N ------
       
+      // Use a longer timeout since we're in Edge Runtime
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 50000); // 50 second timeout
+      
+      // Convert the File to an ArrayBuffer for binary transfer
+      const audioArrayBuffer = await audioFile.arrayBuffer();
+      const audioBytes = new Uint8Array(audioArrayBuffer);
+      
+      // Get additional metadata from formData
+      const sessionId = formData.get('sessionId') as string || '';
+      const email = formData.get('email') as string || '';
+      const domain = request.headers.get('host') || 'vercel';
+      
+      // Create a proper FormData object to send a multipart/form-data request to n8n
+      // n8n expects binary files to be sent as proper multipart/form-data
+      const formDataToSend = new FormData();
+      
+      // Create a new File object from the audio data with explicit filename and type
+      const fileToSend = new File(
+        [audioBytes], 
+        audioFile.name || 'audio.webm',  // Ensure we have a filename
+        { type: audioFile.type || 'audio/webm' }  // Ensure we have a content type
+      );
+      
+      // Add the file as 'audio' which is what n8n is expecting
+      formDataToSend.append('audio', fileToSend);
+      
+      // Add metadata
+      formDataToSend.append('sessionId', sessionId);
+      formDataToSend.append('email', email);
+      formDataToSend.append('domain', domain);
+      formDataToSend.append('source', 'vercel-edge');
+      
+      console.log('Sending to n8n with multipart/form-data approach', {
+        method: 'POST',
+        webhook: webhookUrl,
+        audioSize: fileToSend.size,
+        fileName: fileToSend.name,
+        contentType: fileToSend.type,
+        formDataKeys: ['audio', 'sessionId', 'email', 'domain', 'source']
+      });
+      
+      // Make the request with proper multipart/form-data
       const response = await fetch(webhookUrl, {
         method: 'POST',
-        body: forwardFormData,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Vercel Edge Function',
+          'X-Source': 'Vercel-' + domain
+          // Don't set Content-Type manually, let the browser set it with boundary
+        },
+        body: formDataToSend,
         signal: controller.signal
       });
       
       clearTimeout(timeoutId);
       
+      // Get response details for debugging
+      const responseHeaders = Object.fromEntries(response.headers.entries());
+      
+      console.log('Webhook response received', {
+        status: response.status,
+        statusText: response.statusText,
+        contentType: response.headers.get('content-type')
+      });
+      
       // Check if the response is successful
       if (!response.ok) {
         console.error('Webhook error:', response.status, 'Status text:', response.statusText);
+        // Try to get more detailed error information
         try {
-          // Try to get more error details
           const errorText = await response.text();
           console.error('Error response body:', errorText);
+          
+          // Try to parse as JSON for better error details
+          try {
+            const errorJson = JSON.parse(errorText);
+            console.error('Error JSON:', errorJson);
+          } catch (e) {
+            // Not JSON, that's okay
+          }
         } catch (readError) {
           console.error('Could not read error response:', readError);
         }
@@ -156,13 +218,20 @@ export async function POST(request: NextRequest) {
         console.log('Processing JSON response');
         try {
           const jsonData = await response.json();
+          console.log('Webhook JSON response parsed successfully:', {
+            success: jsonData.success,
+            hasMessage: !!jsonData.message,
+            messageLength: jsonData.message ? jsonData.message.length : 0,
+            responseKeys: Object.keys(jsonData)
+          });
           return NextResponse.json(jsonData);
         } catch (jsonError) {
           console.error('Error parsing JSON response:', jsonError);
           // If JSON parsing fails, return a fallback response
           return NextResponse.json({ 
             success: true, 
-            message: "I received your request, but had trouble processing the response. How can I help you with Dubai real estate today?"
+            message: "I received your request, but had trouble processing the response. How can I help you with Dubai real estate today?",
+            parseError: true
           });
         }
       } 
@@ -170,13 +239,21 @@ export async function POST(request: NextRequest) {
       else {
         console.log('Processing text response');
         const textData = await response.text();
+        console.log('Text response preview:', textData.substring(0, 100) + '...');
+        
         try {
           // Try to parse as JSON in case content type header is incorrect
           const jsonData = JSON.parse(textData);
+          console.log('Text response successfully parsed as JSON');
           return NextResponse.json(jsonData);
         } catch (e) {
+          console.log('Response is not JSON, returning as text');
           // If not valid JSON, return as text
-          return NextResponse.json({ text: textData });
+          return NextResponse.json({ 
+            text: textData.substring(0, 500) + (textData.length > 500 ? '...' : ''),
+            textResponse: true,
+            message: "I received your request but the response format was unexpected. How can I help you with Dubai real estate today?"
+          });
         }
       }
     } catch (error) {
@@ -212,7 +289,8 @@ export async function POST(request: NextRequest) {
           success: true,
           message: "I'm your Real Estate AI assistant. We're having connection issues, but I can still help you find properties in Dubai. What are you looking for today?",
           isFallback: true,
-          reason: "connection_error"
+          reason: "connection_error",
+          errorMessage: (error as Error).message
         });
       }
       
@@ -233,7 +311,8 @@ export async function POST(request: NextRequest) {
         success: true,
         message: "I'm your Real Estate AI assistant. We encountered an internal error, but I can still help you find properties in Dubai. What are you looking for today?",
         isFallback: true,
-        reason: "internal_error"
+        reason: "internal_error",
+        errorMessage: (error as Error).message
       });
     }
     
