@@ -313,7 +313,13 @@ export default function Home() {
   };
   
   const handleButtonClick = () => {
-    if (isLoading || isSpeaking) return; // Don't do anything if loading or Lora is speaking
+    if (isLoading) return; // Don't do anything if loading
+    
+    if (isSpeaking) {
+      // Stop the AI from speaking if it's currently speaking
+      stopSpeaking();
+      return;
+    }
     
     if (isListening) {
       stopListening();
@@ -334,6 +340,16 @@ export default function Home() {
         setMessage(audioRef.current.dataset.aiResponse);
       } else {
         setMessage("Response interrupted.");
+      }
+      
+      // Clean up the blob URL if it exists
+      if (audioRef.current.src) {
+        const objectUrl = audioRef.current.src;
+        if (objectUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(objectUrl);
+          console.log('Revoked audio blob URL');
+        }
+        audioRef.current.src = '';
       }
     }
   };
@@ -612,7 +628,7 @@ export default function Home() {
         </div>
         
         {/* Microphone Button with reduced margin */}
-        <div className="flex flex-col items-center justify-center mb-5 desktop-mb-10">
+        <div className="flex flex-col items-center justify-center mb-6 desktop-mb-10 py-2">
           <button
             onClick={handleButtonClick}
             onMouseDown={() => setIsButtonPressed(true)}
@@ -620,8 +636,8 @@ export default function Home() {
             onMouseLeave={() => setIsButtonPressed(false)}
             onTouchStart={() => setIsButtonPressed(true)}
             onTouchEnd={() => setIsButtonPressed(false)}
-            disabled={isLoading || isSpeaking}
-            className={`w-16 h-16 rounded-full flex items-center justify-center focus:outline-none transition-all duration-300 ${
+            disabled={isLoading}
+            className={`w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center focus:outline-none transition-all duration-300 p-2 ${
               isListening 
                 ? 'bg-red-500 shadow-lg shadow-red-500/50 animate-pulse' 
                 : isLoading
@@ -634,7 +650,7 @@ export default function Home() {
             }`}
           >
             <svg 
-              className={`w-8 h-8 text-white transition-all ${isButtonPressed ? 'scale-90' : 'scale-100'}`} 
+              className={`w-10 h-10 md:w-12 md:h-12 text-white transition-all ${isButtonPressed ? 'scale-90' : 'scale-100'}`} 
               fill="none" 
               stroke="currentColor" 
               viewBox="0 0 24 24" 
@@ -644,7 +660,11 @@ export default function Home() {
                 strokeLinecap="round" 
                 strokeLinejoin="round" 
                 strokeWidth={2} 
-                d={isListening ? "M21 12a9 9 0 11-18 0 9 9 0 0118 0z M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" : "M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"} 
+                d={isListening 
+                   ? "M21 12a9 9 0 11-18 0 9 9 0 0118 0z M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" 
+                   : isSpeaking
+                     ? "M21 12a9 9 0 11-18 0 9 9 0 0118 0z M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
+                     : "M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"} 
               />
             </svg>
           </button>
@@ -652,8 +672,16 @@ export default function Home() {
           {/* Instruction Text with reduced margin */}
           {!isListening && !isLoading && !isSpeaking && (
             <div className="mt-3 desktop-mt-6 px-4 py-2 desktop-py-5 rounded-lg bg-[#6d28d9]/90 backdrop-blur-sm">
-              <p className="text-white font-medium text-sm md:text-base text-center">
+              <p className="text-sm md:text-base lg:text-lg text-white font-medium text-center">
                 <span className="text-[#d8b4fe] font-bold">Click once</span> to start recording, <span className="text-[#d8b4fe] font-bold">click again</span> to stop and process
+              </p>
+            </div>
+          )}
+          
+          {!isListening && !isLoading && isSpeaking && (
+            <div className="mt-3 desktop-mt-6 px-4 py-2 desktop-py-5 rounded-lg bg-[#6d28d9]/90 backdrop-blur-sm">
+              <p className="text-sm md:text-base lg:text-lg text-white font-medium text-center">
+                <span className="text-[#d8b4fe] font-bold">Click</span> to stop Lora from speaking
               </p>
             </div>
           )}
