@@ -16,18 +16,93 @@ export async function POST(request: NextRequest) {
     // Get the audio blob
     const audioFile = formData.get('audio') as File;
     
-    if (!audioFile) {
-      console.error('No audio file provided in request');
+    // Check if this is a test mode request that should generate a test audio file
+    const isTestMode = formData.get('testMode') === 'true';
+    let testAudioFile: File | null = null;
+    
+    if (isTestMode) {
+      console.log('Test mode activated - creating test audio file');
+      
+      try {
+        // Create a simple test WAV file - this is a minimal valid WAV with 1 second of silence
+        // WAV header (44 bytes) + 1 second of silent audio at 8000Hz, 8-bit, mono
+        const sampleRate = 8000;
+        const bytesPerSample = 1;
+        const channels = 1;
+        const seconds = 1;
+        
+        const dataSize = seconds * sampleRate * bytesPerSample * channels;
+        const fileSize = 36 + dataSize;
+        
+        const buffer = new ArrayBuffer(44 + dataSize);
+        const view = new DataView(buffer);
+        
+        // WAV header
+        // "RIFF" chunk descriptor
+        view.setUint8(0, 'R'.charCodeAt(0));
+        view.setUint8(1, 'I'.charCodeAt(0));
+        view.setUint8(2, 'F'.charCodeAt(0));
+        view.setUint8(3, 'F'.charCodeAt(0));
+        view.setUint32(4, fileSize, true); // file size
+        view.setUint8(8, 'W'.charCodeAt(0));
+        view.setUint8(9, 'A'.charCodeAt(0));
+        view.setUint8(10, 'V'.charCodeAt(0));
+        view.setUint8(11, 'E'.charCodeAt(0));
+        
+        // "fmt " sub-chunk
+        view.setUint8(12, 'f'.charCodeAt(0));
+        view.setUint8(13, 'm'.charCodeAt(0));
+        view.setUint8(14, 't'.charCodeAt(0));
+        view.setUint8(15, ' '.charCodeAt(0));
+        view.setUint32(16, 16, true); // size of fmt chunk
+        view.setUint16(20, 1, true); // format = PCM
+        view.setUint16(22, channels, true); // channels
+        view.setUint32(24, sampleRate, true); // sample rate
+        view.setUint32(28, sampleRate * bytesPerSample * channels, true); // byte rate
+        view.setUint16(32, bytesPerSample * channels, true); // block align
+        view.setUint16(34, 8 * bytesPerSample, true); // bits per sample
+        
+        // "data" sub-chunk
+        view.setUint8(36, 'd'.charCodeAt(0));
+        view.setUint8(37, 'a'.charCodeAt(0));
+        view.setUint8(38, 't'.charCodeAt(0));
+        view.setUint8(39, 'a'.charCodeAt(0));
+        view.setUint32(40, dataSize, true); // data size
+        
+        // Fill the rest with silence (128 = 0 level for 8-bit PCM)
+        for (let i = 0; i < dataSize; i++) {
+          view.setUint8(44 + i, 128);
+        }
+        
+        // Create a test audio file
+        testAudioFile = new File([buffer], 'test-silence.wav', { type: 'audio/wav' });
+        console.log('Test audio file created successfully', {
+          size: testAudioFile.size,
+          type: testAudioFile.type,
+          name: testAudioFile.name
+        });
+        
+      } catch (error) {
+        console.error('Error creating test audio file', error);
+      }
+    }
+    
+    if (!audioFile && !testAudioFile) {
+      console.error('No audio file provided in request and test mode failed');
       return NextResponse.json(
         { error: 'No audio file provided' },
         { status: 400 }
       );
     }
     
-    console.log('Audio file received', {
-      name: audioFile.name,
-      type: audioFile.type,
-      size: audioFile.size,
+    // Use either the real audio file or the test file
+    const effectiveAudioFile = audioFile || testAudioFile as File;
+    
+    console.log('Audio file ready for processing', {
+      name: effectiveAudioFile.name,
+      type: effectiveAudioFile.type,
+      size: effectiveAudioFile.size,
+      isTestFile: isTestMode && !audioFile,
       environment: process.env.NODE_ENV,
       formDataKeys: Array.from(formData.keys())
     });
@@ -54,7 +129,7 @@ export async function POST(request: NextRequest) {
           environment: {
             isVercel: process.env.VERCEL === '1',
             webhookUrl: webhookUrl,
-            audioSize: audioFile?.size || 0,
+            audioSize: effectiveAudioFile?.size || 0,
             formData: Array.from(formData.keys())
           }
         });
@@ -94,7 +169,7 @@ export async function POST(request: NextRequest) {
       const timeoutId = setTimeout(() => controller.abort(), 50000); // 50 second timeout
       
       // Convert the File to an ArrayBuffer for binary transfer
-      const audioArrayBuffer = await audioFile.arrayBuffer();
+      const audioArrayBuffer = await effectiveAudioFile.arrayBuffer();
       const audioBytes = new Uint8Array(audioArrayBuffer);
       
       // Get additional metadata from formData
@@ -102,47 +177,208 @@ export async function POST(request: NextRequest) {
       const email = formData.get('email') as string || '';
       const domain = request.headers.get('host') || 'vercel';
       
-      // Create a proper FormData object to send a multipart/form-data request to n8n
-      // n8n expects binary files to be sent as proper multipart/form-data
-      const formDataToSend = new FormData();
+      // For Vercel Edge runtime, let's use a more reliable approach for n8n
+      // Create multipart/form-data manually since Edge runtime may have FormData limitations
+      const boundary = '----WebKitFormBoundary' + Math.random().toString(16).substr(2);
       
-      // Create a new File object from the audio data with explicit filename and type
-      const fileToSend = new File(
-        [audioBytes], 
-        audioFile.name || 'audio.webm',  // Ensure we have a filename
-        { type: audioFile.type || 'audio/webm' }  // Ensure we have a content type
+      // Create parts for our multipart form
+      const parts = [];
+      
+      // Add metadata parts
+      parts.push(
+        `--${boundary}\r\nContent-Disposition: form-data; name="sessionId"\r\n\r\n${sessionId}\r\n`
+      );
+      parts.push(
+        `--${boundary}\r\nContent-Disposition: form-data; name="email"\r\n\r\n${email}\r\n`
+      );
+      parts.push(
+        `--${boundary}\r\nContent-Disposition: form-data; name="domain"\r\n\r\n${domain}\r\n`
+      );
+      parts.push(
+        `--${boundary}\r\nContent-Disposition: form-data; name="source"\r\n\r\nvercel-edge\r\n`
+      );
+      parts.push(
+        `--${boundary}\r\nContent-Disposition: form-data; name="vercelEnv"\r\n\r\n${process.env.VERCEL_ENV || 'unknown'}\r\n`
       );
       
-      // Add the file as 'audio' which is what n8n is expecting
-      formDataToSend.append('audio', fileToSend);
+      // Add explicit content for expected format
+      parts.push(
+        `--${boundary}\r\nContent-Disposition: form-data; name="expectedFormat"\r\n\r\naudio\r\n`
+      );
       
-      // Add metadata
-      formDataToSend.append('sessionId', sessionId);
-      formDataToSend.append('email', email);
-      formDataToSend.append('domain', domain);
-      formDataToSend.append('source', 'vercel-edge');
+      // Add debug info for n8n
+      parts.push(
+        `--${boundary}\r\nContent-Disposition: form-data; name="n8nWebhookInfo"\r\n\r\nThis request contains an 'audio' field as a binary file. If binary data is not detected, please check webhook settings: Enable 'Binary Data' option in webhook configuration.\r\n`
+      );
       
-      console.log('Sending to n8n with multipart/form-data approach', {
+      // Add the file part with the appropriate headers
+      const fileName = effectiveAudioFile.name || 'audio.webm';
+      const fileType = effectiveAudioFile.type || 'audio/webm';
+      
+      // Also include base64 representation as a fallback
+      // Convert to base64 in chunks to avoid call stack issues with large files
+      let base64Audio = '';
+      const chunkSize = 1024; // Process 1KB at a time
+      
+      for (let i = 0; i < Math.min(audioBytes.length, 1024); i += chunkSize) {
+        const chunk = audioBytes.slice(i, i + chunkSize);
+        const binaryString = Array.from(chunk)
+          .map(byte => String.fromCharCode(byte))
+          .join('');
+        base64Audio += btoa(binaryString);
+        
+        // Just get the first chunk for the sample
+        if (base64Audio.length > 100) break;
+      }
+      
+      // Add a debug part to help diagnose issues
+      parts.push(
+        `--${boundary}\r\nContent-Disposition: form-data; name="debug"\r\n\r\ntrue\r\n`
+      );
+      
+      // Add a metadata part with file info
+      parts.push(
+        `--${boundary}\r\nContent-Disposition: form-data; name="fileInfo"\r\n\r\n${JSON.stringify({
+          name: fileName,
+          type: fileType,
+          size: audioBytes.length
+        })}\r\n`
+      );
+      
+      // Add a fallback JSON representation of the audio as base64
+      parts.push(
+        `--${boundary}\r\nContent-Disposition: form-data; name="audioBase64Fallback"\r\n\r\n${base64Audio.substring(0, 100)}...\r\n`
+      );
+      
+      // Start the file part with the appropriate headers
+      let filePart = `--${boundary}\r\nContent-Disposition: form-data; name="audio"; filename="${fileName}"\r\nContent-Type: ${fileType}\r\n\r\n`;
+      
+      // Create binary arrays for each part
+      const textEncoder = new TextEncoder();
+      const textParts = parts.map(part => textEncoder.encode(part));
+      const filePartHeader = textEncoder.encode(filePart);
+      
+      // Calculate total size for the complete request body
+      const endBoundary = textEncoder.encode(`\r\n--${boundary}--\r\n`);
+      let totalSize = textParts.reduce((acc, part) => acc + part.byteLength, 0);
+      totalSize += filePartHeader.byteLength + audioBytes.byteLength + endBoundary.byteLength;
+      
+      // Create a single Uint8Array for the entire request
+      const requestBody = new Uint8Array(totalSize);
+      let offset = 0;
+      
+      // Add text parts to the request body
+      for (const part of textParts) {
+        requestBody.set(part, offset);
+        offset += part.byteLength;
+      }
+      
+      // Add file header
+      requestBody.set(filePartHeader, offset);
+      offset += filePartHeader.byteLength;
+      
+      // Add file data
+      requestBody.set(audioBytes, offset);
+      offset += audioBytes.byteLength;
+      
+      // Add final boundary
+      requestBody.set(endBoundary, offset);
+      
+      console.log('Sending to n8n with manual multipart/form-data approach', {
         method: 'POST',
         webhook: webhookUrl,
-        audioSize: fileToSend.size,
-        fileName: fileToSend.name,
-        contentType: fileToSend.type,
-        formDataKeys: ['audio', 'sessionId', 'email', 'domain', 'source']
+        audioSize: audioBytes.length,
+        fileName: fileName,
+        contentType: fileType,
+        boundaryUsed: boundary.substring(0, 10) + '...',
+        formDataKeys: ['audio', 'sessionId', 'email', 'domain', 'source'],
+        totalSize: totalSize
       });
       
-      // Make the request with proper multipart/form-data
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Vercel Edge Function',
-          'X-Source': 'Vercel-' + domain
-          // Don't set Content-Type manually, let the browser set it with boundary
-        },
-        body: formDataToSend,
-        signal: controller.signal
-      });
+      // In case the primary method fails, also create a fallback method
+      // using both approaches concurrently for reliability
+      let fallbackPromise = null;
+      
+      // Only in Vercel production, send a parallel request using the alternative method
+      if (process.env.VERCEL === '1' && process.env.NODE_ENV === 'production') {
+        console.log('Creating fallback request using base64 JSON method');
+        
+        // Full base64 representation for the fallback
+        // Convert to base64 in chunks to avoid call stack issues with large files
+        let fullBase64Audio = '';
+        const chunkSize = 1024; // Process 1KB at a time
+        
+        for (let i = 0; i < audioBytes.length; i += chunkSize) {
+          const chunk = audioBytes.slice(i, i + chunkSize);
+          const binaryString = Array.from(chunk)
+            .map(byte => String.fromCharCode(byte))
+            .join('');
+          fullBase64Audio += btoa(binaryString);
+        }
+        
+        // Create a JSON payload as fallback
+        const jsonData = {
+          sessionId,
+          email,
+          domain,
+          requestFrom: 'vercel-edge-fallback',
+          binaryAudio: true,
+          audioData: fullBase64Audio,
+          audioType: fileType,
+          audioName: fileName,
+          audioSize: audioBytes.length,
+          isBase64Fallback: true
+        };
+        
+        // Send fallback request
+        const fallbackUrl = webhookUrl + (webhookUrl.includes('?') ? '&' : '?') + 'mode=fallback';
+        
+        fallbackPromise = fetch(fallbackUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'Vercel Edge Function Fallback',
+            'X-Source': 'Vercel-Fallback-' + domain
+          },
+          body: JSON.stringify(jsonData)
+        }).catch(fallbackError => {
+          console.log('Fallback request error (this is fine if primary works):', fallbackError.message);
+          return null;
+        });
+      }
+      
+      // Make the request with manually constructed multipart/form-data
+      let response;
+      try {
+        response = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Vercel Edge Function',
+            'X-Source': 'Vercel-' + domain,
+            'Content-Type': `multipart/form-data; boundary=${boundary}`
+          },
+          body: requestBody,
+          signal: controller.signal
+        });
+      } catch (primaryError) {
+        console.error('Primary request failed:', primaryError);
+        
+        // If fallback was sent, wait for its response
+        if (fallbackPromise) {
+          console.log('Attempting to use fallback response');
+          const fallbackResponse = await fallbackPromise;
+          if (fallbackResponse && fallbackResponse.ok) {
+            console.log('Fallback response received successfully');
+            response = fallbackResponse;
+          } else {
+            throw primaryError; // Re-throw the original error if fallback also failed
+          }
+        } else {
+          throw primaryError;
+        }
+      }
       
       clearTimeout(timeoutId);
       
