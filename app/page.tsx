@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import MicrophoneButton from './components/MicrophoneButton';
-import WaveAnimation from './components/WaveAnimation';
 import DynamicBackground from './components/DynamicBackground';
 import ClientOnly from './components/ClientOnly';
 
@@ -395,28 +394,28 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center py-16 px-8 relative overflow-hidden">
+    <main className="flex min-h-screen flex-col items-center justify-center py-10 px-8 relative overflow-hidden">
       <ClientOnly>
         <DynamicBackground />
       </ClientOnly>
       
-      <div className="w-full max-w-4xl mx-auto flex flex-col items-center justify-between h-full relative z-10">
-        {/* Logo */}
+      <div className="w-full max-w-4xl mx-auto flex flex-col items-center justify-between h-full relative z-10 -mt-20">
+        {/* Logo with enhanced size and subtle glow effect */}
         <div className="mb-8">
           <img 
-            src="/images/Screenshot 2025-05-05 at 22.47.39.png" 
+            src="/images/innovasense-logo.png" 
             alt="InnovaSense" 
-            className="h-14 w-auto" 
+            className="h-40 w-auto filter drop-shadow-lg hover:drop-shadow-xl transition-all duration-300" 
           />
         </div>
         
         {/* Title */}
         <div className="mb-10 text-center">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#9966FF] mb-2">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#8362d9] mb-2">
             Real Estate AI Employee
           </h1>
-          <p className="text-[#B19CD9] text-lg">
-            Dubai Sales & Rental AI Search
+          <p className="text-[#c4b5fd] text-lg">
+            Dubai Rental AI Search
           </p>
         </div>
         
@@ -438,33 +437,42 @@ export default function Home() {
                   : isSpeaking
                     ? 'bg-green-500/70 shadow-lg shadow-green-500/30'
                     : isButtonPressed
-                      ? 'bg-[#3A1A5E] shadow-inner shadow-[#1A0A2E] scale-95'
-                      : 'bg-[#1A0A2E] shadow-lg shadow-[#1A0A2E]/50 hover:bg-[#3A1A5E] hover:scale-105'
+                      ? 'bg-[#6d28d9] scale-95 shadow-inner'
+                      : 'bg-[#6d28d9] shadow-lg shadow-[#6d28d9]/50 hover:bg-[#7e3af2] hover:scale-105'
             }`}
           >
-            {isListening ? (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="white">
-                <rect x="6" y="6" width="8" height="8" />
-              </svg>
-            ) : isLoading ? (
-              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-              </svg>
-            )}
+            <svg 
+              className={`w-8 h-8 text-white transition-all ${isButtonPressed ? 'scale-90' : 'scale-100'}`} 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24" 
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d={isListening ? "M21 12a9 9 0 11-18 0 9 9 0 0118 0z M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" : "M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"} 
+              />
+            </svg>
           </button>
-          <div className="mt-2 text-white text-center">
-            {isListening ? 'Stop' : isLoading ? 'Processing...' : isSpeaking ? 'AI Speaking' : 'Mic'}
-          </div>
+          
+          {/* Instruction Text - Updated to match UI elements */}
+          {!isListening && !isLoading && !isSpeaking && (
+            <div className="mt-4 px-4 py-2 rounded-lg bg-[#6d28d9]/90 backdrop-blur-sm">
+              <p className="text-white font-medium text-sm md:text-base text-center">
+                <span className="text-[#d8b4fe] font-bold">Click once</span> to start recording, <span className="text-[#d8b4fe] font-bold">click again</span> to stop and process
+              </p>
+            </div>
+          )}
         </div>
         
         {/* AI Response Box */}
-        <div className={`bg-[#1A0A2E]/80 rounded-lg px-8 py-4 w-full max-w-sm mx-auto mb-8 backdrop-blur-sm transition-all duration-300 ${
+        <div className={`bg-[#6d28d9]/80 rounded-lg px-8 py-4 w-full max-w-sm mx-auto mb-8 backdrop-blur-sm transition-all duration-300 ${
           isListening ? 'border border-red-500/50 shadow-md shadow-red-500/20' : 
           isLoading ? 'border border-yellow-500/50 shadow-md shadow-yellow-500/20' : 
           isSpeaking ? 'border border-green-500/50 shadow-md shadow-green-500/20' : 
-          'border border-[#3A1A5E]/50'
+          'border border-[#8362d9]/50'
         }`}>
           <p className="text-white text-center font-medium">
             {isListening ? 'Listening...' : 
@@ -479,20 +487,13 @@ export default function Home() {
               isListening ? 'bg-red-500 animate-pulse' : 
               isLoading ? 'bg-yellow-500 animate-pulse' : 
               isSpeaking ? 'bg-green-500 animate-pulse' : 
-              'bg-[#9966FF]/50'
+              'bg-[#c4b5fd]'
             }`}></div>
           </div>
         </div>
         
-        {/* Instruction text - only show when idle */}
-        {!isListening && !isLoading && !isSpeaking && (
-          <p className="text-[#9966FF] text-sm text-center mb-12 italic">
-            Click once to start recording, click again to stop and process
-          </p>
-        )}
-        
         {/* Email input */}
-        <div className="bg-[#1A0A2E]/80 border border-[#3A1A5E] rounded-lg p-4 backdrop-blur-md w-full max-w-md mb-6">
+        <div className="bg-[#6d28d9]/80 border border-[#8362d9] rounded-lg p-4 backdrop-blur-md w-full max-w-md mb-6">
           <p className="text-white text-center mb-4">
             Ask the AI Assistant to email you the conversation.
           </p>
@@ -501,12 +502,12 @@ export default function Home() {
               id="email-input"
               type="email" 
               placeholder="Enter your email address" 
-              className="flex-1 bg-[#3A1A5E]/70 text-white border border-[#B19CD9]/50 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8A2BE2]/50"
+              className="flex-1 bg-[#7e3af2]/70 text-white border border-[#c4b5fd]/50 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#a78bda]/70"
               value={userEmail}
               onChange={(e) => setUserEmail(e.target.value)}
             />
             <button 
-              className="bg-[#8A2BE2]/80 hover:bg-[#8A2BE2] text-white px-3 py-2 rounded-lg transition-colors duration-200"
+              className="bg-[#7e3af2] hover:bg-[#8362d9] text-white px-3 py-2 rounded-lg transition-colors duration-200"
               onClick={handleEmailSubmit}
             >
               <svg 
@@ -524,10 +525,7 @@ export default function Home() {
         </div>
       </div>
       
-      {/* Wave animation at the bottom */}
-      <ClientOnly>
-        <WaveAnimation isListening={true} />
-      </ClientOnly>
+      {/* Wave animation removed */}
       
       {/* Hidden audio element for playback */}
       <audio 

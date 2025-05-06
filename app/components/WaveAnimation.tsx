@@ -7,47 +7,50 @@ interface WaveAnimationProps {
 }
 
 export default function WaveAnimation({ isListening }: WaveAnimationProps) {
-  // Create more wave lines to match the image
-  const waveCount = 12;
+  // Create fewer wave lines to be less distracting
+  const waveCount = 6; // Reduced from 12
   const waves = Array.from({ length: waveCount }, (_, i) => i);
   
-  // Colors that match our updated violet background
+  // Colors that match our lighter indigo theme
   const colors = [
-    'bg-[#9966FF]',
-    'bg-[#8A2BE2]',
-    'bg-[#B19CD9]',
-    'bg-[#7B68EE]',
-    'bg-[#9370DB]'
+    'bg-[#8362d9]', // Lighter indigo
+    'bg-[#7e3af2]', // Main lighter indigo
+    'bg-[#a78bda]', // Soft indigo
+    'bg-[#c4b5fd]', // Pale indigo
+    'bg-[#d8b4fe]', // Light lavender
+    'bg-[#9370db]'  // Medium purple
   ];
   
   return (
     <div className="absolute bottom-0 left-0 right-0 w-full overflow-hidden">
-      <div className="relative h-[300px]">
+      <div className="relative h-[200px]"> {/* Reduced height */}
         {waves.map((i) => {
-          const amplitude = 15 + i * 2;
-          const period = 1 + i * 0.2;
-          const phase = i * 0.5;
-          const colorIndex = i % colors.length;
+          const amplitude = 10 + i * 2; // Reduced amplitude
+          const period = 0.8 + i * 0.2; // Adjusted period
+          const height = 8 + i * 2; // Reduced height
+          const width = 1800 + i * 30;
+          const color = colors[i % colors.length];
+          const delay = i * 0.15;
           
           return (
             <motion.div
-              key={`wave-${i}`}
-              className={`absolute bottom-0 left-0 right-0 h-[120px] ${colors[colorIndex]}/30`}
+              key={i}
+              className={`absolute bottom-0 left-1/2 ${color} opacity-20 rounded-t-[100%]`} // Slightly increased opacity
               style={{
-                maskImage: `url("data:image/svg+xml;utf8,<svg viewBox='0 0 1200 120' xmlns='http://www.w3.org/2000/svg'><path d='M0,${60 + amplitude} C300,${60 - amplitude} 600,${60 + amplitude} 1200,${60 - amplitude}' fill='%23000'/></svg>")`,
-                maskSize: `${1200 * period}px 120px`,
-                maskRepeat: 'repeat-x',
-                transform: `translateY(${i * 10}px)`,
+                height: `${height}px`,
+                width: `${width}px`,
+                marginLeft: `-${width / 2}px`
               }}
               animate={{
-                maskPosition: [`-${1200 * period}px 0px`, `0px 0px`],
+                y: [0, -amplitude, 0], // Smaller movements
+                scaleX: [1, 1 + period * 0.008, 1], // Reduced scale changes
+                opacity: isListening ? [0.2, 0.3, 0.2] : [0.15, 0.2, 0.15] // Subtler opacity changes
               }}
               transition={{
-                duration: 10 + i * 2,
-                ease: "linear",
                 repeat: Infinity,
-                repeatType: "loop",
-                delay: i * 0.2,
+                duration: 4 + period, // Slower animation
+                ease: "easeInOut",
+                delay: delay
               }}
             />
           );

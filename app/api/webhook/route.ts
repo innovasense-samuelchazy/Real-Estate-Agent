@@ -8,8 +8,10 @@ export async function POST(request: NextRequest) {
     // Log that we received the request
     console.log('Received request in API route, forwarding to n8n webhook');
     
-    // Use the new webhook URL
-    const webhookUrl = 'https://innovasense.app.n8n.cloud/webhook/lora/stt';
+    // Use environment variable with fallback
+    const webhookUrl = process.env.WEBHOOK_URL || 'https://innovasense.app.n8n.cloud/webhook/lora/stt';
+    
+    console.log('Using webhook URL:', webhookUrl);
     
     // Forward the request to the n8n webhook
     const response = await fetch(webhookUrl, {

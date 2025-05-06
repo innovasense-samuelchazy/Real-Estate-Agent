@@ -46,6 +46,8 @@ export async function POST(request: NextRequest) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 50000); // 50 second timeout
       
+      console.log('Attempting to fetch from webhook with URL:', webhookUrl);
+      
       const response = await fetch(webhookUrl, {
         method: 'POST',
         body: forwardFormData,
@@ -56,7 +58,15 @@ export async function POST(request: NextRequest) {
       
       // Check if the response is successful
       if (!response.ok) {
-        console.error('Webhook error:', response.status);
+        console.error('Webhook error:', response.status, 'Status text:', response.statusText);
+        try {
+          // Try to get more error details
+          const errorText = await response.text();
+          console.error('Error response body:', errorText);
+        } catch (readError) {
+          console.error('Could not read error response:', readError);
+        }
+        
         return NextResponse.json(
           { error: `Webhook returned status ${response.status}` },
           { status: response.status }
