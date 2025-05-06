@@ -108,3 +108,18 @@ main {
   scrollbar-width: thin;
   scrollbar-color: #7c3aed rgba(76, 29, 149, 0.3);
 }
+
+/* Mobile optimization - ensure all content is visible */
+@media screen and (max-height: 800px) {
+  /* Adjust content for smaller mobile screens */
+  main {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+  }
+
+  /* Fix for iOS Safari viewport height issues */
+  .min-h-screen {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+}

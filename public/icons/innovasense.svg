@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 60">
+  <style>
+    .logo-text { fill: #FFFFFF; font-family: Arial, sans-serif; font-weight: 300; }
+    .highlight { fill: #9966FF; }
+    .circle { fill: #66DDDD; }
+  </style>
+  <circle class="circle" cx="30" cy="30" r="20" />
+  <text x="60" y="40" class="logo-text" font-size="30">innova<tspan class="highlight">sense</tspan></text>
+</svg> 

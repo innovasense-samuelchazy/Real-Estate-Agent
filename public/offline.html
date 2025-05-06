@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Innovasense - Offline</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background-color: #1A0A2E;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    .logo {
+      width: 120px;
+      height: 120px;
+      margin-bottom: 30px;
+    }
+    .title {
+      font-size: 28px;
+      margin-bottom: 15px;
+      color: #9966FF;
+    }
+    .message {
+      font-size: 18px;
+      max-width: 500px;
+      line-height: 1.5;
+      margin-bottom: 30px;
+    }
+    .retry-button {
+      background-color: #9966FF;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 24px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    .retry-button:hover {
+      background-color: #7B52CC;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo">
+    <!-- Inline SVG version of your logo for offline access -->
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="45" fill="#5ED4D1" />
+      <path d="M35,35 L45,45 M45,35 L35,45 M55,35 L65,45 M65,35 L55,45 M40,65 L60,65" stroke="white" stroke-width="3" />
+    </svg>
+  </div>
+  <h1 class="title">You're Offline</h1>
+  <p class="message">
+    It looks like you've lost your internet connection. The Innovasense Real Estate AI requires an internet connection to work properly.
+  </p>
+  <button class="retry-button" onclick="window.location.reload()">Try Again</button>
+
+  <script>
+    // Check if online and redirect if connection is restored
+    window.addEventListener('online', () => {
+      window.location.href = '/';
+    });
+  </script>
+</body>
+</html> 

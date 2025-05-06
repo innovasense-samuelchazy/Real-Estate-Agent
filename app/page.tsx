@@ -582,28 +582,28 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center py-10 px-8 relative overflow-hidden bg-gradient-to-b from-[#1e1b4b] to-[#4c2889]">
+    <main className="flex min-h-screen flex-col items-center justify-start py-6 px-8 relative overflow-hidden bg-gradient-to-b from-[#1e1b4b] to-[#4c2889]">
       <ClientOnly>
         <DynamicBackground />
         <WaveAnimation isListening={isListening} />
       </ClientOnly>
       
       <div className="w-full max-w-4xl mx-auto flex flex-col items-center justify-between h-full relative z-10">
-        {/* Logo with enhanced size and subtle glow effect */}
-        <div className="mb-8">
+        {/* Logo with reduced margin */}
+        <div className="mb-4">
           <Image 
             src="/images/innovasense-logo.png" 
             alt="InnovaSense" 
             width={100}
             height={40}
-            className="h-40 w-auto filter drop-shadow-lg hover:drop-shadow-xl transition-all duration-300" 
+            className="h-32 w-auto filter drop-shadow-lg hover:drop-shadow-xl transition-all duration-300" 
             priority
           />
         </div>
         
-        {/* Title */}
-        <div className="mb-10 text-center">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#8362d9] mb-2">
+        {/* Title with reduced margin */}
+        <div className="mb-6 text-center">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#8362d9] mb-1">
             Real Estate AI Employee
           </h1>
           <p className="text-[#c4b5fd] text-lg">
@@ -611,8 +611,8 @@ export default function Home() {
           </p>
         </div>
         
-        {/* Microphone Button */}
-        <div className="flex flex-col items-center justify-center mb-8">
+        {/* Microphone Button with reduced margin */}
+        <div className="flex flex-col items-center justify-center mb-5">
           <button
             onClick={handleButtonClick}
             onMouseDown={() => setIsButtonPressed(true)}
@@ -649,9 +649,9 @@ export default function Home() {
             </svg>
           </button>
           
-          {/* Instruction Text - Updated to match UI elements */}
+          {/* Instruction Text with reduced margin */}
           {!isListening && !isLoading && !isSpeaking && (
-            <div className="mt-4 px-4 py-2 rounded-lg bg-[#6d28d9]/90 backdrop-blur-sm">
+            <div className="mt-3 px-4 py-2 rounded-lg bg-[#6d28d9]/90 backdrop-blur-sm">
               <p className="text-white font-medium text-sm md:text-base text-center">
                 <span className="text-[#d8b4fe] font-bold">Click once</span> to start recording, <span className="text-[#d8b4fe] font-bold">click again</span> to stop and process
               </p>
@@ -659,8 +659,8 @@ export default function Home() {
           )}
         </div>
         
-        {/* AI Response Box */}
-        <div className={`bg-[#6d28d9]/80 rounded-lg px-8 py-4 w-full max-w-sm mx-auto mb-8 backdrop-blur-sm transition-all duration-300 ${
+        {/* AI Response Box with reduced margin */}
+        <div className={`bg-[#6d28d9]/80 rounded-lg px-8 py-4 w-full max-w-sm mx-auto mb-5 backdrop-blur-sm transition-all duration-300 ${
           isListening ? 'border border-red-500/50 shadow-md shadow-red-500/20' : 
           isLoading ? 'border border-yellow-500/50 shadow-md shadow-yellow-500/20' : 
           isSpeaking ? 'border border-green-500/50 shadow-md shadow-green-500/20' : 
@@ -687,7 +687,7 @@ export default function Home() {
           
           {/* Fallback mode button - only show when there's an API error */}
           {hasApiError && !hasFallbackEnabled && (
-            <div className="mt-4 flex justify-center">
+            <div className="mt-3 flex justify-center">
               <button 
                 onClick={enableFallbackMode}
                 className="bg-[#7e3af2] hover:bg-[#6d28d9] text-white text-sm px-3 py-1 rounded-lg transition-colors duration-200"
@@ -698,9 +698,9 @@ export default function Home() {
           )}
         </div>
         
-        {/* Email input */}
-        <div className="bg-[#6d28d9]/80 border border-[#8362d9] rounded-lg p-4 backdrop-blur-md w-full max-w-md">
-          <p className="text-white text-center mb-4">
+        {/* Email input with compact styling */}
+        <div className="bg-[#6d28d9]/80 border border-[#8362d9] rounded-lg p-3 backdrop-blur-md w-full max-w-md">
+          <p className="text-white text-center mb-3">
             Ask the AI Assistant to email you the conversation.
           </p>
           <div className="flex items-center gap-2">
