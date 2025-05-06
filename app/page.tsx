@@ -301,7 +301,24 @@ export default function Home() {
         
         // Check if the response is ok
         if (!response.ok) {
-          throw new Error(`API error! status: ${response.status}`);
+          console.error(`API error! status: ${response.status}`);
+          
+          // Try to get more detailed error information
+          try {
+            const errorJson = await response.json();
+            console.error('Error details:', errorJson);
+            
+            // Use the message if available, otherwise use a generic message
+            const errorMessage = errorJson.message || 
+                                `The AI assistant encountered an error (${response.status}). Please try again later.`;
+            
+            setMessage(errorMessage);
+          } catch (jsonError) {
+            // If we can't parse the JSON, just use a generic message
+            setMessage(`The AI assistant encountered an error (${response.status}). Please try again later.`);
+          }
+          
+          return;
         }
         
         // Get content type to determine how to handle the response
@@ -326,7 +343,7 @@ export default function Home() {
           if (jsonData.success) {
             setMessage(jsonData.message || "Your message has been processed successfully!");
           } else {
-            setMessage(jsonData.error || "There was an error processing your message.");
+            setMessage(jsonData.message || jsonData.error || "There was an error processing your message.");
           }
         }
         else {
@@ -341,14 +358,14 @@ export default function Home() {
         console.error('Error sending audio:', error);
         
         if (error instanceof DOMException && error.name === 'AbortError') {
-          setMessage('Request took too long. The assistant is still processing your message in the background.');
+          setMessage('Request took too long. The AI assistant service may be busy. Please try again shortly.');
         } else {
-          setMessage('Error: ' + (error as Error).message);
+          setMessage('Connection error: ' + (error as Error).message + '. Please check your internet connection.');
         }
       }
     } catch (error) {
       console.error('Error preparing audio:', error);
-      setMessage('Error preparing your message. Please try again.');
+      setMessage('Error preparing your message. Please try again with a different question.');
     } finally {
       setIsLoading(false);
     }

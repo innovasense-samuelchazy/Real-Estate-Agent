@@ -5,6 +5,8 @@ export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('Speech API route called');
+    
     // Get the form data from the request
     const formData = await request.formData();
     
@@ -12,11 +14,18 @@ export async function POST(request: NextRequest) {
     const audioFile = formData.get('audio') as File;
     
     if (!audioFile) {
+      console.error('No audio file provided in request');
       return NextResponse.json(
         { error: 'No audio file provided' },
         { status: 400 }
       );
     }
+    
+    console.log('Audio file received', {
+      name: audioFile.name,
+      type: audioFile.type,
+      size: audioFile.size
+    });
     
     // Create a new FormData to forward to the webhook
     const forwardFormData = new FormData();
@@ -36,8 +45,10 @@ export async function POST(request: NextRequest) {
       console.log('Forwarding email:', email);
     }
     
-    // Forward the request to the webhook
-    const webhookUrl = process.env.WEBHOOK_URL || 'https://innovasense.app.n8n.cloud/webhook/lora/stt';
+    // Get webhook URL with fallback
+    const webhookUrl = process.env.NEXT_PUBLIC_WEBHOOK_URL || 
+                       process.env.WEBHOOK_URL || 
+                       'https://innovasense.app.n8n.cloud/webhook/lora/stt';
     
     console.log('Forwarding request to webhook:', webhookUrl);
     
@@ -47,6 +58,16 @@ export async function POST(request: NextRequest) {
       const timeoutId = setTimeout(() => controller.abort(), 50000); // 50 second timeout
       
       console.log('Attempting to fetch from webhook with URL:', webhookUrl);
+      
+      // Return fallback response if we're in development and MOCK_API is set
+      if (process.env.NEXT_PUBLIC_MOCK_API === 'true') {
+        console.log('Using mock API response for development');
+        clearTimeout(timeoutId);
+        return NextResponse.json({
+          success: true,
+          message: "This is a mock response for development. In production, this would connect to the actual AI service."
+        });
+      }
       
       const response = await fetch(webhookUrl, {
         method: 'POST',
@@ -67,18 +88,26 @@ export async function POST(request: NextRequest) {
           console.error('Could not read error response:', readError);
         }
         
+        // Return a more informative error
         return NextResponse.json(
-          { error: `Webhook returned status ${response.status}` },
-          { status: response.status }
+          { 
+            error: `Webhook returned status ${response.status}`,
+            message: "The AI service is currently unavailable. Please try again later.",
+            technical_detail: `Status: ${response.status}, StatusText: ${response.statusText}`
+          },
+          { status: 500 }
         );
       }
       
       // Get the content type to determine how to handle the response
       const contentType = response.headers.get('content-type') || '';
+      console.log('Webhook response content type:', contentType);
       
       // For audio responses, pass through the binary data
       if (contentType.includes('audio/')) {
+        console.log('Processing audio response');
         const audioBuffer = await response.arrayBuffer();
+        console.log('Audio response size:', audioBuffer.byteLength);
         
         // Return the audio with safe headers
         return new NextResponse(audioBuffer, {
@@ -89,11 +118,13 @@ export async function POST(request: NextRequest) {
       } 
       // For JSON responses
       else if (contentType.includes('application/json')) {
+        console.log('Processing JSON response');
         const jsonData = await response.json();
         return NextResponse.json(jsonData);
       } 
       // For text or other responses
       else {
+        console.log('Processing text response');
         const textData = await response.text();
         return NextResponse.json({ text: textData });
       }
@@ -103,8 +134,8 @@ export async function POST(request: NextRequest) {
         console.error('Request to webhook timed out');
         return NextResponse.json(
           { 
-            success: true,
-            message: 'Your message is being processed in the background. Please wait a moment for the response.',
+            success: false,
+            message: 'The AI service is taking too long to respond. Please try again later.',
             timeout: true
           },
           { status: 202 } // 202 Accepted
@@ -113,14 +144,20 @@ export async function POST(request: NextRequest) {
       
       console.error('Error forwarding to webhook:', error);
       return NextResponse.json(
-        { error: `Error forwarding to webhook: ${(error as Error).message}` },
+        { 
+          error: `Error connecting to AI service: ${(error as Error).message}`,
+          message: "Please check your internet connection and try again."
+        },
         { status: 500 }
       );
     }
   } catch (error) {
     console.error('API route error:', error);
     return NextResponse.json(
-      { error: `Internal server error: ${(error as Error).message}` },
+      { 
+        error: `Internal server error: ${(error as Error).message}`,
+        message: "An unexpected error occurred. Please try again later."
+      },
       { status: 500 }
     );
   }
