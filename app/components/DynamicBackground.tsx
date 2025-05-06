@@ -1,162 +1,171 @@
-'use client';
-
 import React, { useEffect, useRef } from 'react';
 
-export default function DynamicBackground() {
+const DynamicBackground: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   useEffect(() => {
-    console.log('DynamicBackground component mounted');
-    
     const canvas = canvasRef.current;
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Set canvas to full window size
-    const resize = () => {
-      if (!canvas) return;
+    // Set canvas to full screen
+    const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
     
-    resize();
-    window.addEventListener('resize', resize);
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
     
-    // Force TypeScript to accept that canvas is not null inside this scope
-    // since we've already checked it at the beginning of the useEffect
-    const safeCanvas = canvas;
+    // Simple elegant wave colors with purple theme
+    const waveColors = [
+      { color: '#9966FF', opacity: 0.15 }, // Main purple
+      { color: '#8A2BE2', opacity: 0.1 }, // Secondary purple
+    ];
     
-    // Particle class
-    class Particle {
-      x: number;
-      y: number;
-      size: number;
-      speedX: number;
-      speedY: number;
-      color: string;
-      
-      constructor() {
-        this.x = Math.random() * safeCanvas.width;
-        this.y = Math.random() * safeCanvas.height;
-        this.size = Math.random() * 3 + 0.5;
-        this.speedX = Math.random() * 1 - 0.5;
-        this.speedY = Math.random() * 1 - 0.5;
+    // Subtle particle colors
+    const particleColors = [
+      '#9966FF', // Purple
+      '#8A7ED9', // Lavender
+      '#A89AE0', // Light purple
+    ];
+    
+    // Very minimal particles, mostly near center
+    const particles = Array.from({ length: 15 }, () => {
+      // Concentrate particles in center horizontal band
+      const centerBiasX = Math.random() * canvas.width;
+      const centerBiasY = canvas.height * 0.5 + (Math.random() - 0.5) * canvas.height * 0.2;
         
-        // Brighter indigo colors palette for better visibility
-        const colors = [
-          'rgba(93, 63, 211, 0.9)',   // #5d3fd3 - Mid indigo
-          'rgba(126, 58, 242, 0.8)',   // #7e3af2 - Bright indigo
-          'rgba(131, 98, 217, 0.7)',   // #8362d9 - Light indigo
-          'rgba(196, 181, 253, 0.6)'   // #c4b5fd - Very light indigo
-        ];
-        
-        this.color = colors[Math.floor(Math.random() * colors.length)];
-      }
-      
-      update() {
-        this.x += this.speedX;
-        this.y += this.speedY;
-        
-        // Bounce off edges
-        if (this.x > safeCanvas.width || this.x < 0) {
-          this.speedX = -this.speedX;
-        }
-        
-        if (this.y > safeCanvas.height || this.y < 0) {
-          this.speedY = -this.speedY;
-        }
-      }
-      
-      draw() {
-        if (!ctx) return;
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
+      return {
+        x: centerBiasX,
+        y: centerBiasY,
+        radius: Math.random() * 1 + 0.2,
+        color: particleColors[Math.floor(Math.random() * particleColors.length)],
+        speed: Math.random() * 0.15 + 0.05,
+        pulse: Math.random() * 0.2 + 0.1
+      };
+    });
     
-    // Create particles
-    const particles: Particle[] = [];
-    const particleCount = Math.min(Math.floor(window.innerWidth * window.innerHeight / 8000), 150);
+    let animationFrameId: number;
+    let time = 0;
     
-    for (let i = 0; i < particleCount; i++) {
-      particles.push(new Particle());
-    }
-    
-    // Animation loop
     const animate = () => {
-      if (!ctx) return;
+      time += 0.01;
       
-      // Create a gradient background with more vibrant colors
-      const gradient = ctx.createLinearGradient(0, 0, 0, safeCanvas.height);
-      // Brighter indigo gradient
-      gradient.addColorStop(0, '#4c2889');  // Mid-dark indigo at the top
-      gradient.addColorStop(1, '#7e3af2');  // Brighter indigo at the bottom
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, safeCanvas.width, safeCanvas.height);
+      // Draw background with subtle gradient
+      const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      bgGradient.addColorStop(0, '#1A0A2E'); // Dark violet
+      bgGradient.addColorStop(0.5, '#2A1A4E'); // Medium violet
+      bgGradient.addColorStop(1, '#3A2A5E'); // Light violet at bottom
       
-      // Update and draw particles
+      ctx.fillStyle = bgGradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw minimal particles
       particles.forEach(particle => {
-        particle.update();
-        particle.draw();
+        // Very subtle pulsing
+        const pulsingRadius = particle.radius * (1 + 0.05 * Math.sin(time * particle.pulse));
+        
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, pulsingRadius, 0, Math.PI * 2);
+        
+        // Very low opacity
+        const opacity = 0.05 + 0.05 * Math.sin(time * particle.pulse);
+        ctx.fillStyle = particle.color + Math.floor(opacity * 255).toString(16).padStart(2, '0');
+        ctx.fill();
+        
+        // Barely visible glow
+        ctx.shadowColor = particle.color;
+        ctx.shadowBlur = 1;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        // Slow horizontal movement
+        particle.x += particle.speed * 0.2;
+        
+        // Wrap around edges
+        if (particle.x > canvas.width) particle.x = 0;
       });
       
-      // Draw connections between particles
-      connect();
+      // Draw a single elegant horizontal wave across the center
+      const waveY = canvas.height * 0.5; // Center of screen
+      const waveHeight = canvas.height * 0.06; // Height of wave area
+      const waveWidth = canvas.width;
       
-      requestAnimationFrame(animate);
-    };
-    
-    // Connect particles with lines if they're close enough
-    function connect() {
-      if (!ctx) return;
-      
-      const maxDistance = 150;
-      
-      for (let a = 0; a < particles.length; a++) {
-        for (let b = a; b < particles.length; b++) {
-          const dx = particles[a].x - particles[b].x;
-          const dy = particles[a].y - particles[b].y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
+      // Draw two overlapping waves for depth
+      waveColors.forEach((waveColor, wIndex) => {
+        const amplitude = waveHeight * (wIndex === 0 ? 1 : 0.6);
+        const frequency = 0.003 * (wIndex === 0 ? 1 : 1.5);
+        const speed = 0.2 * (wIndex === 0 ? 1 : 1.2);
+        const yOffset = wIndex === 0 ? 0 : waveHeight * 0.2;
+        
+        ctx.beginPath();
+        
+        // Create a smooth path from left to right
+        ctx.moveTo(0, waveY + yOffset);
+        
+        // Draw wave with finer points for smoother appearance
+        for (let x = 0; x < waveWidth; x += 1) {
+          // Create flowing motion
+          const flowX = x + time * 30 * speed;
           
-          // Avoid drawing lines near the bottom of the screen
-          const bottomEdgeBuffer = 300; // Don't draw lines in the bottom 300px (increased from 100px)
-          const nearBottom = 
-            particles[a].y > safeCanvas.height - bottomEdgeBuffer || 
-            particles[b].y > safeCanvas.height - bottomEdgeBuffer;
-            
-          if (distance < maxDistance && !nearBottom) {
-            // Set opacity based on distance - increased opacity for better visibility
-            const opacity = 1 - (distance / maxDistance);
-            ctx.strokeStyle = `rgba(214, 188, 250, ${opacity * 0.3})`;  // Brighter color with higher opacity
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(particles[a].x, particles[a].y);
-            ctx.lineTo(particles[b].x, particles[b].y);
-            ctx.stroke();
-          }
+          // Calculate smooth wave with subtle secondary motion
+          const y = waveY + yOffset + 
+                  Math.sin(flowX * frequency) * amplitude * 0.7 + 
+                  Math.sin(flowX * frequency * 2) * amplitude * 0.3;
+          
+          ctx.lineTo(x, y);
         }
-      }
-    }
+        
+        // Complete the path for fill
+        ctx.lineTo(waveWidth, canvas.height);
+        ctx.lineTo(0, canvas.height);
+        ctx.closePath();
+        
+        // Create very subtle gradient for wave
+        const gradient = ctx.createLinearGradient(0, waveY - amplitude, 0, waveY + amplitude);
+        gradient.addColorStop(0, waveColor.color + '05'); // Almost invisible at top
+        gradient.addColorStop(0.5, waveColor.color + Math.floor(waveColor.opacity * 255).toString(16).padStart(2, '0')); // Main color in middle  
+        gradient.addColorStop(1, waveColor.color + '02'); // Almost invisible at bottom
+        
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        
+        // Draw extremely thin wave line
+        ctx.strokeStyle = waveColor.color + '20'; // Very low opacity
+        ctx.lineWidth = 0.3;
+        ctx.stroke();
+        
+        // Add very subtle glow
+        ctx.shadowColor = waveColor.color;
+        ctx.shadowBlur = 2;
+        ctx.strokeStyle = waveColor.color + '15';
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      });
+      
+      animationFrameId = requestAnimationFrame(animate);
+    };
     
     animate();
     
     return () => {
-      window.removeEventListener('resize', resize);
+      window.removeEventListener('resize', resizeCanvas);
+      cancelAnimationFrame(animationFrameId);
     };
   }, []);
   
   return (
-    <canvas
-      ref={canvasRef}
-      className="fixed top-0 left-0 w-full h-full -z-10 opacity-100"
-      aria-hidden="true"
-      width={typeof window !== 'undefined' ? window.innerWidth : 1280}
-      height={typeof window !== 'undefined' ? window.innerHeight : 720}
+    <canvas 
+      ref={canvasRef} 
+      className="fixed top-0 left-0 w-full h-full -z-10"
     />
   );
-} 
+};
+
+export default DynamicBackground; 
