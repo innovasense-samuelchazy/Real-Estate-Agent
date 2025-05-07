@@ -558,8 +558,9 @@ export default function Home() {
 
   // Helper function to play audio response
   const playAudioResponse = (audioBlob: Blob, aiResponseText: string) => {
-    // Create a URL for the blob
-    const audioUrl = URL.createObjectURL(audioBlob);
+    // Create a URL for the blob with explicit MIME type for iOS
+    const audioBlob2 = new Blob([audioBlob], { type: 'audio/mpeg' });
+    const audioUrl = URL.createObjectURL(audioBlob2);
     
     if (audioRef.current) {
       // Store the AI response text in the audio element's dataset for later use
@@ -573,22 +574,6 @@ export default function Home() {
           setMessage("Error playing audio response: " + err.message);
           setIsSpeaking(false);
         });
-      };
-      
-      audioRef.current.onended = () => {
-        // Update the message with the AI response when audio ends
-        const responseText = audioRef.current?.dataset.aiResponse || aiResponseText || "";
-        setMessage(responseText);
-        
-        // Clean up the blob URL
-        URL.revokeObjectURL(audioUrl);
-        setIsSpeaking(false); // Set speaking state to false when audio ends
-      };
-      
-      audioRef.current.onerror = (e) => {
-        console.error('Audio element error:', e);
-        setMessage("Error loading audio response");
-        setIsSpeaking(false);
       };
       
       // Now set the source and attempt to play

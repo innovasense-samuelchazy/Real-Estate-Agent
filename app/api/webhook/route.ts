@@ -86,7 +86,8 @@ export async function POST(request: NextRequest) {
       return new NextResponse(audioBuffer, {
         status: 200,
         headers: {
-          'Content-Type': contentType,
+          'Content-Type': 'audio/mpeg', // Use standard format that iOS supports
+          'X-Content-Type-Options': 'nosniff' // Prevent browser from sniffing content type
         },
       });
     } 
