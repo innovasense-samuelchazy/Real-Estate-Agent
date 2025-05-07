@@ -313,17 +313,25 @@ export default function Home() {
   };
   
   const handleButtonClick = () => {
-    if (isLoading) return; // Don't do anything if loading
+    console.log("Button clicked", { isLoading, isSpeaking, isListening });
+    
+    if (isLoading) {
+      console.log("Ignoring click while loading");
+      return; // Don't do anything if loading
+    }
     
     if (isSpeaking) {
       // Stop the AI from speaking if it's currently speaking
+      console.log("Stopping AI speech");
       stopSpeaking();
       return;
     }
     
     if (isListening) {
+      console.log("Stopping listening");
       stopListening();
     } else {
+      console.log("Starting listening");
       startListening();
     }
   };
@@ -576,6 +584,27 @@ export default function Home() {
         });
       };
       
+      // Add onended event handler to reset speaking state when audio finishes
+      audioRef.current.onended = () => {
+        console.log('Audio playback ended');
+        setIsSpeaking(false);
+        
+        // If we have an AI response text, show it
+        if (audioRef.current?.dataset.aiResponse) {
+          setMessage(audioRef.current.dataset.aiResponse);
+        }
+        
+        // Clean up the blob URL
+        URL.revokeObjectURL(audioUrl);
+      };
+      
+      // Add onerror event handler
+      audioRef.current.onerror = (e) => {
+        console.error('Audio playback error:', e);
+        setIsSpeaking(false);
+        setMessage("Error playing audio response");
+      };
+      
       // Now set the source and attempt to play
       audioRef.current.src = audioUrl;
       setMessage("Lora is responding...");
@@ -619,8 +648,18 @@ export default function Home() {
             onMouseDown={() => setIsButtonPressed(true)}
             onMouseUp={() => setIsButtonPressed(false)}
             onMouseLeave={() => setIsButtonPressed(false)}
-            onTouchStart={() => setIsButtonPressed(true)}
-            onTouchEnd={() => setIsButtonPressed(false)}
+            onTouchStart={() => {
+              console.log("Touch start detected");
+              setIsButtonPressed(true);
+            }}
+            onTouchEnd={() => {
+              console.log("Touch end detected");
+              setIsButtonPressed(false);
+            }}
+            onTouchCancel={() => {
+              console.log("Touch cancelled");
+              setIsButtonPressed(false);
+            }}
             disabled={isLoading}
             className={`w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center focus:outline-none transition-all duration-300 p-2 ${
               isListening 
@@ -749,6 +788,9 @@ export default function Home() {
         ref={audioRef} 
         className="hidden" 
         controls={false}
+        playsInline
+        preload="auto"
+        webkit-playsinline="true"
       />
     </main>
   );
