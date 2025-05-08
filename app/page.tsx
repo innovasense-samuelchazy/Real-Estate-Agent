@@ -571,6 +571,7 @@ export default function Home() {
     const audioUrl = URL.createObjectURL(audioBlob2);
     
     if (audioRef.current) {
+      audioRef.current.autoplay = true;
       // Store the AI response text in the audio element's dataset for later use
       audioRef.current.dataset.aiResponse = aiResponseText || "";
       
@@ -790,6 +791,7 @@ export default function Home() {
         controls={false}
         playsInline
         preload="auto"
+        autoPlay
         webkit-playsinline="true"
       />
     </main>
