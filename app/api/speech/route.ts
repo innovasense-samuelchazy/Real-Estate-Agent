@@ -441,10 +441,10 @@ export async function POST(request: NextRequest) {
         const audioBuffer = await response.arrayBuffer();
         console.log('Audio response size:', audioBuffer.byteLength);
         
-        // Return the audio with safe headers
+        // Return the audio with explicit WebM content type regardless of what n8n returns
         return new NextResponse(audioBuffer, {
           headers: {
-            'Content-Type': contentType,
+            'Content-Type': 'audio/webm',
           }
         });
       } 

@@ -566,23 +566,37 @@ export default function Home() {
 
   // Helper function to play audio response
   const playAudioResponse = (audioBlob: Blob, aiResponseText: string) => {
-    // Create a URL for the blob with explicit MIME type for iOS
-    const audioBlob2 = new Blob([audioBlob], { type: 'audio/mpeg' });
+    // Create a URL for the blob with explicit webm MIME type for all devices
+    const audioBlob2 = new Blob([audioBlob], { type: 'audio/webm' });
     const audioUrl = URL.createObjectURL(audioBlob2);
     
     if (audioRef.current) {
+      // Set autoplay and other properties required for iOS/Safari
       audioRef.current.autoplay = true;
+      audioRef.current.setAttribute('playsInline', 'true');
+      
       // Store the AI response text in the audio element's dataset for later use
       audioRef.current.dataset.aiResponse = aiResponseText || "";
       
       // Set up event listeners before setting the source
       audioRef.current.onloadedmetadata = () => {
         setIsSpeaking(true); // Set speaking state to true when audio starts
-        audioRef.current?.play().catch(err => {
-          console.error('Error playing audio:', err);
-          setMessage("Error playing audio response: " + err.message);
-          setIsSpeaking(false);
-        });
+        // Use a user interaction promise for iOS
+        const playPromise = audioRef.current?.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            console.log('Audio playback started successfully');
+          }).catch(err => {
+            console.error('Error playing audio:', err);
+            // Try a different approach for iOS
+            document.addEventListener('touchend', function playAudioAfterTouch() {
+              audioRef.current?.play();
+              document.removeEventListener('touchend', playAudioAfterTouch);
+            }, { once: true });
+            setMessage("Tap anywhere to hear the response");
+            setIsSpeaking(false);
+          });
+        }
       };
       
       // Add onended event handler to reset speaking state when audio finishes
@@ -793,6 +807,7 @@ export default function Home() {
         preload="auto"
         autoPlay
         webkit-playsinline="true"
+        x-webkit-airplay="allow"
       />
     </main>
   );
